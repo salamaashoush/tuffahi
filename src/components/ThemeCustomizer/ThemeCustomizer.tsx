@@ -4,6 +4,7 @@
  */
 
 import { Component, createSignal, createEffect, For, Show } from 'solid-js';
+import { X, Check } from 'lucide-solid';
 import { themeService, ThemeService, Theme, ThemeColors } from '../../services/themes';
 import { logger } from '../../services/logger';
 
@@ -116,18 +117,14 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
           }}
           class="absolute top-2 right-2 p-1 rounded-full bg-black/30 hover:bg-black/50 text-white/60 hover:text-white transition-colors"
         >
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-          </svg>
+          <X size={16} />
         </button>
       </Show>
 
       {/* Active indicator */}
       <Show when={currentTheme().id === cardProps.theme.id}>
         <div class="absolute bottom-2 right-2">
-          <svg class="w-5 h-5 text-apple-red" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-          </svg>
+          <Check size={20} class="text-apple-red" />
         </div>
       </Show>
     </button>
@@ -151,9 +148,7 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
                 onClick={props.onClose}
                 class="text-white/40 hover:text-white transition-smooth"
               >
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </svg>
+                <X size={24} />
               </button>
             </div>
 

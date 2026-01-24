@@ -4,6 +4,7 @@
  */
 
 import { Component, createSignal, createEffect, For, Show } from 'solid-js';
+import { ArrowLeft, Play } from 'lucide-solid';
 import { catalogAPI } from '../../services/api';
 import { LazyImage } from '../LazyImage/LazyImage';
 import { logger } from '../../services/logger';
@@ -137,9 +138,7 @@ const GenreBrowse: Component<GenreBrowseProps> = (props) => {
               onClick={() => setSelectedGenre(null)}
               class="p-2 rounded-full bg-surface-secondary hover:bg-surface-tertiary transition-smooth"
             >
-              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-              </svg>
+              <ArrowLeft size={20} class="text-white" />
             </button>
             <h2 class="text-2xl font-bold text-white">{selectedGenre()?.name}</h2>
           </div>
@@ -168,9 +167,7 @@ const GenreBrowse: Component<GenreBrowseProps> = (props) => {
                           />
                           <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                             <button class="opacity-0 group-hover:opacity-100 transition-opacity p-3 bg-apple-red rounded-full">
-                              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
+                              <Play size={24} class="text-white" fill="currentColor" />
                             </button>
                           </div>
                         </div>
@@ -203,9 +200,7 @@ const GenreBrowse: Component<GenreBrowseProps> = (props) => {
                           />
                           <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                             <button class="opacity-0 group-hover:opacity-100 transition-opacity p-3 bg-apple-red rounded-full">
-                              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
+                              <Play size={24} class="text-white" fill="currentColor" />
                             </button>
                           </div>
                         </div>
