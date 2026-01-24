@@ -4,6 +4,7 @@
  */
 
 import { Component, createSignal, createEffect, onCleanup, Show } from 'solid-js';
+import { X, Clock, Plus } from 'lucide-solid';
 import { playerStore } from '../../stores/player';
 import { storageService } from '../../services/storage';
 import { logger } from '../../services/logger';
@@ -176,9 +177,7 @@ const SleepTimer: Component<SleepTimerProps> = (props) => {
               onClick={props.onClose}
               class="text-white/40 hover:text-white transition-smooth"
             >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
+              <X size={20} />
             </button>
           </div>
 
@@ -293,9 +292,7 @@ export const SleepTimerIndicator: Component<{ remainingTime: number; onClick: ()
       class="flex items-center gap-1 px-2 py-1 bg-apple-red/20 rounded text-xs text-apple-red"
       title="Sleep timer active"
     >
-      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z" />
-      </svg>
+      <Clock size={12} />
       <span>{Math.ceil(props.remainingTime / 60000)}m</span>
     </button>
   </Show>

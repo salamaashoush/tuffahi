@@ -4,6 +4,7 @@
  */
 
 import { Component, createSignal, createEffect, Show, For } from 'solid-js';
+import { X, Plus, Trash2, Check } from 'lucide-solid';
 import { playlistAPI } from '../../services/api';
 import { logger } from '../../services/logger';
 
@@ -82,9 +83,7 @@ export const CreatePlaylistModal: Component<CreatePlaylistModalProps> = (props) 
               onClick={props.onClose}
               class="text-white/40 hover:text-white transition-smooth"
             >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
+              <X size={20} />
             </button>
           </div>
 
@@ -238,9 +237,7 @@ export const EditPlaylistModal: Component<EditPlaylistModalProps> = (props) => {
               onClick={props.onClose}
               class="text-white/40 hover:text-white transition-smooth"
             >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-              </svg>
+              <X size={20} />
             </button>
           </div>
 
@@ -256,9 +253,7 @@ export const EditPlaylistModal: Component<EditPlaylistModalProps> = (props) => {
               <div class="text-center">
                 <div class="mb-6">
                   <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-apple-red/20 flex items-center justify-center">
-                    <svg class="w-8 h-8 text-apple-red" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                    </svg>
+                    <Trash2 size={32} class="text-apple-red" />
                   </div>
                   <h3 class="text-lg font-semibold text-white mb-2">Delete Playlist?</h3>
                   <p class="text-white/60 text-sm">
@@ -421,9 +416,7 @@ export const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) =>
                 onClick={props.onClose}
                 class="text-white/40 hover:text-white transition-smooth"
               >
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </svg>
+                <X size={20} />
               </button>
             </div>
 
@@ -442,9 +435,7 @@ export const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) =>
               class="flex items-center gap-3 p-3 mb-3 rounded-lg bg-surface-secondary hover:bg-surface-tertiary transition-smooth"
             >
               <div class="w-12 h-12 rounded-lg bg-apple-red flex items-center justify-center">
-                <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
+                <Plus size={24} class="text-white" />
               </div>
               <span class="text-white font-medium">Create New Playlist</span>
             </button>
@@ -474,9 +465,7 @@ export const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) =>
                       </div>
                     </div>
                     <Show when={selectedPlaylist() === playlist.id}>
-                      <svg class="w-5 h-5 text-apple-red" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                      </svg>
+                      <Check size={20} class="text-apple-red" />
                     </Show>
                   </button>
                 )}

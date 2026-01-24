@@ -3,6 +3,9 @@
  * Export all components from a single entry point
  */
 
+// Icons (re-exported from lucide-solid)
+export * from './Icons/Icons';
+
 // Error Handling
 export { AppErrorBoundary, SectionErrorBoundary } from './ErrorBoundary/ErrorBoundary';
 
