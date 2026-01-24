@@ -1,9 +1,10 @@
-import { Component, lazy, Suspense, createSignal } from 'solid-js';
+import { Component, lazy, Suspense, createSignal, onMount } from 'solid-js';
 import { Route, Router } from '@solidjs/router';
 import { useMusicKit } from './hooks/useMusicKit';
 import { useTrayEvents } from './hooks/useTrayEvents';
 import { useMediaKeys } from './hooks/useMediaKeys';
 import { useBrowserNotifications } from './hooks/useNotifications';
+import { themeService } from './services/themes';
 import Sidebar from './components/Sidebar/Sidebar';
 import Player from './components/Player/Player';
 import QueuePanel from './components/Queue/QueuePanel';
@@ -49,6 +50,11 @@ const AppLayout: Component<{ children?: any }> = (props) => {
 
   // Initialize MusicKit on app load
   useMusicKit();
+
+  // Initialize theme service
+  onMount(() => {
+    themeService.init();
+  });
 
   // Set up system tray event handlers
   useTrayEvents();

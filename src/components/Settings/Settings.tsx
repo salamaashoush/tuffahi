@@ -1,6 +1,9 @@
 import { Component, Show, createSignal, onMount } from 'solid-js';
+import { Palette } from 'lucide-solid';
 import { musicKitStore } from '../../stores/musickit';
 import { invoke } from '@tauri-apps/api/core';
+import { themeService } from '../../services/themes';
+import ThemeCustomizer from '../ThemeCustomizer/ThemeCustomizer';
 
 interface SettingsState {
   audioQuality: 'high' | 'lossless' | 'dolby';
@@ -24,6 +27,8 @@ const Settings: Component = () => {
   });
 
   const [isMusicKitConfigured, setIsMusicKitConfigured] = createSignal(false);
+  const [showThemeCustomizer, setShowThemeCustomizer] = createSignal(false);
+  const [currentThemeName, setCurrentThemeName] = createSignal(themeService.getCurrentTheme().name);
 
   onMount(async () => {
     // Check if MusicKit is properly configured
@@ -44,6 +49,11 @@ const Settings: Component = () => {
         // Ignore parse errors
       }
     }
+
+    // Listen for theme changes
+    themeService.onThemeChange((theme) => {
+      setCurrentThemeName(theme.name);
+    });
   });
 
   const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => {
@@ -176,6 +186,30 @@ const Settings: Component = () => {
         </div>
       </section>
 
+      {/* Appearance Section */}
+      <section class="mb-8">
+        <h2 class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Appearance</h2>
+        <div class="bg-surface-secondary rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowThemeCustomizer(true)}
+            class="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <Palette size={20} class="text-white" />
+              </div>
+              <div class="text-left">
+                <p class="text-white font-medium">Theme</p>
+                <p class="text-sm text-white/60">{currentThemeName()}</p>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
       {/* Notifications Section */}
       <section class="mb-8">
         <h2 class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Notifications</h2>
@@ -274,6 +308,12 @@ const Settings: Component = () => {
           </p>
         </div>
       </section>
+
+      {/* Theme Customizer Modal */}
+      <ThemeCustomizer
+        isOpen={showThemeCustomizer()}
+        onClose={() => setShowThemeCustomizer(false)}
+      />
     </div>
   );
 };
