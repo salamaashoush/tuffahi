@@ -47,7 +47,7 @@
     "resources": [],
     "category": "Music",
     "shortDescription": "Apple Music Client",
-    "longDescription": "A cross-platform Apple Music client built with Tauri and SolidJS",
+    "longDescription": "Unofficial cross-platform client for Apple Music built with Tauri and SolidJS. Not affiliated with Apple Inc.",
     "linux": {
       "appimage": {
         "bundleMediaFramework": true

@@ -1,6 +1,8 @@
 # Apple Music Client
 
-A cross-platform Apple Music client built with **Tauri v2**, **SolidJS**, and **MusicKit JS**.
+An **unofficial** cross-platform Apple Music client built with **Tauri v2**, **SolidJS**, and **MusicKit JS**.
+
+> **Disclaimer:** This is an unofficial third-party client. Not affiliated with or endorsed by Apple Inc. Requires an Apple Music subscription.
 
 ## Features
 

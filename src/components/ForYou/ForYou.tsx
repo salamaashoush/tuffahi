@@ -115,7 +115,7 @@ const ForYou: Component = () => {
             <div class="w-24 h-24 rounded-full bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center mb-6">
               <span class="text-5xl text-white">♫</span>
             </div>
-            <h2 class="text-2xl font-bold text-white mb-2">Welcome to Apple Music</h2>
+            <h2 class="text-2xl font-bold text-white mb-2">Welcome</h2>
             <p class="text-white/60 text-center mb-6 max-w-md">
               Sign in with your Apple ID to get personalized recommendations, access your library, and discover new music.
             </p>
