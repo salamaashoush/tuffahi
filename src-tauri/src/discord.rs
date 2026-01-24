@@ -5,8 +5,9 @@ use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-// Discord Application ID (you'd create this in Discord Developer Portal)
-const DISCORD_APP_ID: &str = "1234567890123456789"; // Replace with actual ID
+// Discord Application ID - Create your own at https://discord.com/developers/applications
+// This is a placeholder and must be replaced with your own Application ID
+const DISCORD_APP_ID: &str = "0000000000000000000";
 
 lazy_static::lazy_static! {
     static ref DISCORD_CLIENT: Arc<Mutex<Option<DiscordIpcClient>>> = Arc::new(Mutex::new(None));
@@ -86,11 +87,7 @@ pub async fn discord_set_activity(
         activity_builder = activity_builder.timestamps(timestamps);
     }
 
-    // Add buttons
-    activity_builder = activity_builder.buttons(vec![activity::Button::new(
-        "Listen on Apple Music",
-        "https://music.apple.com",
-    )]);
+    // Note: Buttons removed - add your own if needed
 
     client
         .set_activity(activity_builder)
