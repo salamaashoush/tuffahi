@@ -278,7 +278,8 @@ const Settings: Component = () => {
             </div>
           </div>
           <p class="text-sm text-white/40">
-            Built with Tauri, SolidJS, and MusicKit JS
+            Unofficial client built with Tauri, SolidJS, and MusicKit JS.
+            Not affiliated with Apple Inc.
           </p>
         </div>
       </section>

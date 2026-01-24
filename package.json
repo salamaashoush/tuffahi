@@ -1,7 +1,7 @@
 {
   "name": "apple-music-client",
   "version": "0.1.0",
-  "description": "Cross-platform Apple Music client built with Tauri, SolidJS, and MusicKit",
+  "description": "Unofficial cross-platform Apple Music client built with Tauri, SolidJS, and MusicKit. Not affiliated with Apple Inc.",
   "type": "module",
   "scripts": {
     "dev": "vite",
