@@ -96,16 +96,7 @@ const Settings: Component = () => {
             </Show>
           </div>
 
-          <Show when={!isMusicKitConfigured()}>
-            <div class="px-4 pb-4">
-              <div class="p-3 bg-yellow-500/20 border border-yellow-500/40 rounded-lg">
-                <p class="text-sm text-yellow-400">
-                  MusicKit credentials not configured. Add your Apple Developer credentials to enable music playback.
-                </p>
-              </div>
-            </div>
-          </Show>
-        </div>
+                  </div>
       </section>
 
       {/* Playback Section */}
