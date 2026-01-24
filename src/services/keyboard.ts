@@ -1,0 +1,312 @@
+/**
+ * Keyboard Shortcuts Service
+ * Handles global keyboard shortcuts and media keys
+ */
+
+import { register, unregister, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
+import { logger } from './logger';
+import { storageService } from './storage';
+
+export interface KeyboardShortcut {
+  id: string;
+  name: string;
+  description: string;
+  defaultKey: string;
+  currentKey: string;
+  action: () => void | Promise<void>;
+  category: 'playback' | 'navigation' | 'app';
+}
+
+class KeyboardService {
+  private shortcuts: Map<string, KeyboardShortcut> = new Map();
+  private registeredKeys: Set<string> = new Set();
+  private isEnabled = true;
+
+  async init(): Promise<void> {
+    try {
+      const settings = await storageService.getSettings();
+      this.isEnabled = settings.keyboardShortcutsEnabled !== false;
+
+      // Load custom key bindings
+      const customBindings = await this.loadCustomBindings();
+
+      // Apply custom bindings to shortcuts
+      for (const [id, key] of Object.entries(customBindings)) {
+        const shortcut = this.shortcuts.get(id);
+        if (shortcut) {
+          shortcut.currentKey = key;
+        }
+      }
+
+      if (this.isEnabled) {
+        await this.registerAll();
+      }
+
+      logger.info('keyboard', 'Keyboard service initialized');
+    } catch (error) {
+      logger.error('keyboard', 'Failed to initialize keyboard service', { error });
+    }
+  }
+
+  registerShortcut(shortcut: Omit<KeyboardShortcut, 'currentKey'>): void {
+    const fullShortcut: KeyboardShortcut = {
+      ...shortcut,
+      currentKey: shortcut.defaultKey,
+    };
+    this.shortcuts.set(shortcut.id, fullShortcut);
+  }
+
+  async registerAll(): Promise<void> {
+    if (!this.isEnabled) return;
+
+    for (const shortcut of this.shortcuts.values()) {
+      await this.registerKey(shortcut);
+    }
+  }
+
+  async unregisterAll(): Promise<void> {
+    try {
+      await unregisterAll();
+      this.registeredKeys.clear();
+      logger.info('keyboard', 'All shortcuts unregistered');
+    } catch (error) {
+      logger.error('keyboard', 'Failed to unregister shortcuts', { error });
+    }
+  }
+
+  private async registerKey(shortcut: KeyboardShortcut): Promise<boolean> {
+    if (this.registeredKeys.has(shortcut.currentKey)) {
+      return true;
+    }
+
+    try {
+      await register(shortcut.currentKey, async () => {
+        try {
+          await shortcut.action();
+          logger.debug('keyboard', 'Shortcut executed', { id: shortcut.id });
+        } catch (error) {
+          logger.error('keyboard', 'Shortcut action failed', { id: shortcut.id, error });
+        }
+      });
+
+      this.registeredKeys.add(shortcut.currentKey);
+      logger.debug('keyboard', 'Shortcut registered', { id: shortcut.id, key: shortcut.currentKey });
+      return true;
+    } catch (error) {
+      logger.warn('keyboard', 'Failed to register shortcut', { id: shortcut.id, key: shortcut.currentKey, error });
+      return false;
+    }
+  }
+
+  async updateShortcut(id: string, newKey: string): Promise<boolean> {
+    const shortcut = this.shortcuts.get(id);
+    if (!shortcut) return false;
+
+    // Unregister old key
+    if (this.registeredKeys.has(shortcut.currentKey)) {
+      try {
+        await unregister(shortcut.currentKey);
+        this.registeredKeys.delete(shortcut.currentKey);
+      } catch (error) {
+        logger.warn('keyboard', 'Failed to unregister old shortcut', { id, key: shortcut.currentKey });
+      }
+    }
+
+    // Update and register new key
+    shortcut.currentKey = newKey;
+    const success = await this.registerKey(shortcut);
+
+    if (success) {
+      await this.saveCustomBindings();
+    }
+
+    return success;
+  }
+
+  async resetShortcut(id: string): Promise<boolean> {
+    const shortcut = this.shortcuts.get(id);
+    if (!shortcut) return false;
+
+    return this.updateShortcut(id, shortcut.defaultKey);
+  }
+
+  async resetAll(): Promise<void> {
+    await this.unregisterAll();
+
+    for (const shortcut of this.shortcuts.values()) {
+      shortcut.currentKey = shortcut.defaultKey;
+    }
+
+    await this.registerAll();
+    await this.saveCustomBindings();
+  }
+
+  async setEnabled(enabled: boolean): Promise<void> {
+    this.isEnabled = enabled;
+    await storageService.saveSettings({ keyboardShortcutsEnabled: enabled });
+
+    if (enabled) {
+      await this.registerAll();
+    } else {
+      await this.unregisterAll();
+    }
+  }
+
+  getShortcuts(): KeyboardShortcut[] {
+    return Array.from(this.shortcuts.values());
+  }
+
+  getShortcutsByCategory(category: KeyboardShortcut['category']): KeyboardShortcut[] {
+    return this.getShortcuts().filter((s) => s.category === category);
+  }
+
+  isConflicting(key: string, excludeId?: string): boolean {
+    for (const shortcut of this.shortcuts.values()) {
+      if (shortcut.id !== excludeId && shortcut.currentKey.toLowerCase() === key.toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async loadCustomBindings(): Promise<Record<string, string>> {
+    try {
+      const settings = await storageService.getSettings();
+      return settings.customKeyBindings || {};
+    } catch {
+      return {};
+    }
+  }
+
+  private async saveCustomBindings(): Promise<void> {
+    const bindings: Record<string, string> = {};
+
+    for (const shortcut of this.shortcuts.values()) {
+      if (shortcut.currentKey !== shortcut.defaultKey) {
+        bindings[shortcut.id] = shortcut.currentKey;
+      }
+    }
+
+    await storageService.saveSettings({ customKeyBindings: bindings });
+  }
+}
+
+export const keyboardService = new KeyboardService();
+
+// Default shortcuts setup - will be called from App initialization
+export function setupDefaultShortcuts(playerActions: {
+  playPause: () => void;
+  next: () => void;
+  previous: () => void;
+  volumeUp: () => void;
+  volumeDown: () => void;
+  toggleMute: () => void;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+  seekForward: () => void;
+  seekBackward: () => void;
+  toggleMiniPlayer: () => void;
+}): void {
+  // Playback controls
+  keyboardService.registerShortcut({
+    id: 'play-pause',
+    name: 'Play/Pause',
+    description: 'Toggle playback',
+    defaultKey: 'MediaPlayPause',
+    category: 'playback',
+    action: playerActions.playPause,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'next-track',
+    name: 'Next Track',
+    description: 'Skip to next track',
+    defaultKey: 'MediaTrackNext',
+    category: 'playback',
+    action: playerActions.next,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'previous-track',
+    name: 'Previous Track',
+    description: 'Go to previous track',
+    defaultKey: 'MediaTrackPrevious',
+    category: 'playback',
+    action: playerActions.previous,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'volume-up',
+    name: 'Volume Up',
+    description: 'Increase volume',
+    defaultKey: 'CommandOrControl+Up',
+    category: 'playback',
+    action: playerActions.volumeUp,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'volume-down',
+    name: 'Volume Down',
+    description: 'Decrease volume',
+    defaultKey: 'CommandOrControl+Down',
+    category: 'playback',
+    action: playerActions.volumeDown,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'toggle-mute',
+    name: 'Toggle Mute',
+    description: 'Mute/unmute audio',
+    defaultKey: 'CommandOrControl+M',
+    category: 'playback',
+    action: playerActions.toggleMute,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'toggle-shuffle',
+    name: 'Toggle Shuffle',
+    description: 'Toggle shuffle mode',
+    defaultKey: 'CommandOrControl+S',
+    category: 'playback',
+    action: playerActions.toggleShuffle,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'toggle-repeat',
+    name: 'Toggle Repeat',
+    description: 'Cycle repeat mode',
+    defaultKey: 'CommandOrControl+R',
+    category: 'playback',
+    action: playerActions.toggleRepeat,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'seek-forward',
+    name: 'Seek Forward',
+    description: 'Skip forward 10 seconds',
+    defaultKey: 'CommandOrControl+Right',
+    category: 'playback',
+    action: playerActions.seekForward,
+  });
+
+  keyboardService.registerShortcut({
+    id: 'seek-backward',
+    name: 'Seek Backward',
+    description: 'Skip backward 10 seconds',
+    defaultKey: 'CommandOrControl+Left',
+    category: 'playback',
+    action: playerActions.seekBackward,
+  });
+
+  // App controls
+  keyboardService.registerShortcut({
+    id: 'toggle-miniplayer',
+    name: 'Toggle Mini Player',
+    description: 'Show/hide mini player',
+    defaultKey: 'CommandOrControl+Shift+M',
+    category: 'app',
+    action: playerActions.toggleMiniPlayer,
+  });
+}
+
+export default keyboardService;
