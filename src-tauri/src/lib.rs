@@ -4,6 +4,7 @@
 //! including JWT token generation for MusicKit authentication.
 
 pub mod commands;
+pub mod discord;
 pub mod musickit;
 
 /// Initialize environment variables for Wayland compatibility on Linux.
@@ -26,6 +27,7 @@ fn init_linux_env() {
 }
 
 use commands::{get_developer_token, is_musickit_configured, refresh_developer_token};
+use discord::{discord_clear_activity, discord_connect, discord_disconnect, discord_set_activity};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -63,6 +65,10 @@ pub fn run() {
             close_mini_player,
             hide_main_window,
             show_main_window,
+            discord_connect,
+            discord_disconnect,
+            discord_set_activity,
+            discord_clear_activity,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
