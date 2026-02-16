@@ -231,7 +231,7 @@ export const KeyboardHint: Component<{ keys: string[]; action: string }> = (prop
     <div class="flex items-center gap-2 text-xs text-white/40">
       <div class="flex gap-1">
         {props.keys.map((key) => (
-          <kbd class="px-1.5 py-0.5 bg-surface-secondary rounded text-white/60 font-mono">
+          <kbd class="px-1.5 py-0.5 bg-surface-secondary rounded-sm text-white/60 font-mono">
             {key}
           </kbd>
         ))}

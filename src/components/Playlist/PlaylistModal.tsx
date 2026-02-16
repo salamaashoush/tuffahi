@@ -101,7 +101,7 @@ export const CreatePlaylistModal: Component<CreatePlaylistModalProps> = (props) 
                 value={name()}
                 onInput={(e) => setName(e.currentTarget.value)}
                 placeholder="My Playlist"
-                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red"
+                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red"
                 autofocus
               />
             </div>
@@ -113,7 +113,7 @@ export const CreatePlaylistModal: Component<CreatePlaylistModalProps> = (props) 
                 onInput={(e) => setDescription(e.currentTarget.value)}
                 placeholder="Add a description..."
                 rows={3}
-                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red resize-none"
+                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red resize-none"
               />
             </div>
 
@@ -287,7 +287,7 @@ export const EditPlaylistModal: Component<EditPlaylistModalProps> = (props) => {
                   type="text"
                   value={name()}
                   onInput={(e) => setName(e.currentTarget.value)}
-                  class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-apple-red"
+                  class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-apple-red"
                 />
               </div>
 
@@ -297,7 +297,7 @@ export const EditPlaylistModal: Component<EditPlaylistModalProps> = (props) => {
                   value={description()}
                   onInput={(e) => setDescription(e.currentTarget.value)}
                   rows={3}
-                  class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-apple-red resize-none"
+                  class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-apple-red resize-none"
                   disabled
                 />
                 <p class="text-xs text-white/40 mt-1">

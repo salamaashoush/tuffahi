@@ -228,7 +228,7 @@ export const useContextMenu = () => {
 
 // Helper to create track context menu items
 export function createTrackMenuItems(
-  track: { id: string; type: string; attributes: { name: string; artistName: string } },
+  track: { id: string; type: string; attributes: { name: string; artistName: string; url?: string } },
   options?: {
     onPlayNext?: () => void;
     onAddToQueue?: () => void;
@@ -237,6 +237,9 @@ export function createTrackMenuItems(
     onGoToArtist?: () => void;
     onGoToAlbum?: () => void;
     onShare?: () => void;
+    onLove?: () => void;
+    onRemoveLove?: () => void;
+    isLoved?: boolean;
   }
 ): MenuItem[] {
   const items: MenuItem[] = [];
@@ -260,6 +263,25 @@ export function createTrackMenuItems(
   }
 
   items.push({ id: 'divider-1', label: '', divider: true });
+
+  // Love / Remove Love
+  if (options?.onLove || options?.onRemoveLove) {
+    if (options?.isLoved && options?.onRemoveLove) {
+      items.push({
+        id: 'remove-love',
+        label: 'Remove Love',
+        icon: '♡',
+        onClick: options.onRemoveLove,
+      });
+    } else if (options?.onLove) {
+      items.push({
+        id: 'love',
+        label: 'Love',
+        icon: '♥',
+        onClick: options.onLove,
+      });
+    }
+  }
 
   if (options?.onAddToLibrary) {
     items.push({

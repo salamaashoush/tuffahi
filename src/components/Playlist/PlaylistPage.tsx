@@ -1,9 +1,13 @@
-import { Component, createSignal, createEffect, For, Show } from 'solid-js';
-import { useParams, A } from '@solidjs/router';
+import { Component, createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
+import { useParams, A, useNavigate } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
 import { libraryStore } from '../../stores/library';
 import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
+import { useContextMenu, createTrackMenuItems } from '../ContextMenu/ContextMenu';
+import { copyShareLink } from '../../lib/share';
+import { ratingsStore } from '../../stores/ratings';
+import HeartButton from '../Rating/HeartButton';
 
 interface PlaylistData {
   id: string;
@@ -58,31 +62,33 @@ interface TrackData {
   };
 }
 
+interface PlaylistPageData {
+  playlist: PlaylistData;
+  initialTracks: TrackData[];
+  nextUrl: string | null;
+}
+
 const PlaylistPage: Component = () => {
   const params = useParams<{ id: string }>();
-  const [playlist, setPlaylist] = createSignal<PlaylistData | null>(null);
+  const navigate = useNavigate();
+  const contextMenu = useContextMenu();
   const [tracks, setTracks] = createSignal<TrackData[]>([]);
-  const [isLoading, setIsLoading] = createSignal(true);
   const [isLoadingMore, setIsLoadingMore] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
   const [nextUrl, setNextUrl] = createSignal<string | null>(null);
   const [isInLibrary, setIsInLibrary] = createSignal(false);
-  const [dominantColor, setDominantColor] = createSignal('#1c1c1e');
 
   const isLibraryPlaylist = () => params.id?.startsWith('p.');
 
-  createEffect(async () => {
-    const mk = musicKitStore.instance();
-    if (!mk || !params.id) return;
-
-    setIsLoading(true);
-    setError(null);
-    setTracks([]);
-
-    try {
-      const endpoint = isLibraryPlaylist()
-        ? `/v1/me/library/playlists/${params.id}`
-        : `/v1/catalog/us/playlists/${params.id}`;
+  const [playlistData] = createResource(
+    () => {
+      const mk = musicKitStore.instance();
+      const id = params.id;
+      return mk && id ? { mk, id } : null;
+    },
+    async ({ mk, id }): Promise<PlaylistPageData> => {
+      const endpoint = id.startsWith('p.')
+        ? `/v1/me/library/playlists/${id}`
+        : `/v1/catalog/{{storefrontId}}/playlists/${id}`;
 
       const response = await mk.api.music(endpoint, {
         include: 'tracks',
@@ -90,37 +96,50 @@ const PlaylistPage: Component = () => {
       });
 
       const data = response.data as { data: PlaylistData[] };
-      const playlistData = data.data[0];
-      setPlaylist(playlistData);
-      setTracks(playlistData.relationships?.tracks?.data || []);
-      setNextUrl(playlistData.relationships?.tracks?.next || null);
+      const playlist = data.data?.[0];
+      if (!playlist) throw new Error('Playlist not found');
 
-      // Extract dominant color
-      if (playlistData.attributes.artwork?.bgColor) {
-        setDominantColor(`#${playlistData.attributes.artwork.bgColor}`);
-      }
+      return {
+        playlist,
+        initialTracks: playlist.relationships?.tracks?.data || [],
+        nextUrl: playlist.relationships?.tracks?.next || null,
+      };
+    }
+  );
 
-      // Check library status for catalog playlists
-      if (!isLibraryPlaylist() && musicKitStore.isAuthorized()) {
-        try {
-          const libraryCheck = await mk.api.music(
-            `/v1/me/library/playlists`,
-            { 'filter[catalog-id]': params.id }
-          );
-          const libraryData = libraryCheck.data as { data: unknown[] };
-          setIsInLibrary(libraryData.data.length > 0);
-        } catch {
-          // Ignore
-        }
-      } else if (isLibraryPlaylist()) {
-        setIsInLibrary(true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load playlist');
-    } finally {
-      setIsLoading(false);
+  // Sync tracks and nextUrl from resource data
+  createEffect(() => {
+    const data = playlistData();
+    if (data) {
+      setTracks(data.initialTracks);
+      setNextUrl(data.nextUrl);
     }
   });
+
+  // Check library status when playlist loads
+  createEffect(() => {
+    const data = playlistData();
+    if (!data) return;
+
+    if (isLibraryPlaylist()) {
+      setIsInLibrary(true);
+    } else if (musicKitStore.isAuthorized()) {
+      const mk = musicKitStore.instance();
+      if (!mk) return;
+      mk.api.music<{ data: unknown[] }>('/v1/me/library/playlists', { 'filter[catalog-id]': params.id })
+        .then((res) => {
+          setIsInLibrary((res.data?.data?.length ?? 0) > 0);
+        })
+        .catch(() => {});
+    }
+  });
+
+  const dominantColor = createMemo(() => {
+    const bgColor = playlistData()?.playlist.attributes.artwork?.bgColor;
+    return bgColor ? `#${bgColor}` : '#1c1c1e';
+  });
+
+  const playlist = () => playlistData()?.playlist ?? null;
 
   const loadMoreTracks = async () => {
     const mk = musicKitStore.instance();
@@ -161,9 +180,11 @@ const PlaylistPage: Component = () => {
   };
 
   const handleShufflePlaylist = async () => {
-    const mk = musicKitStore.instance();
+    const mk = musicKitStore.instance() as any;
     if (!mk || !playlist()) return;
 
+    mk.shuffleMode = 1;
+    playerStore.setShuffleMode('on');
     await mk.setQueue({ playlist: playlist()!.id });
     await mk.play();
   };
@@ -179,13 +200,8 @@ const PlaylistPage: Component = () => {
     if (!mk || !playlist() || isLibraryPlaylist()) return;
 
     try {
-      await mk.api.music('/v1/me/library', {}, {
-        fetchOptions: {
-          method: 'POST',
-          body: JSON.stringify({
-            data: [{ id: playlist()!.id, type: 'playlists' }]
-          })
-        }
+      await mk.api.music(`/v1/me/library?ids[playlists]=${playlist()!.id}`, {}, {
+        fetchOptions: { method: 'POST' }
       });
       setIsInLibrary(true);
       libraryStore.fetchPlaylists();
@@ -198,31 +214,31 @@ const PlaylistPage: Component = () => {
 
   return (
     <div class="pb-8">
-      <Show when={error()}>
+      <Show when={playlistData.error}>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4 mb-6">
-          <p class="text-red-400">{error()}</p>
+          <p class="text-red-400">{playlistData.error?.message || 'Failed to load playlist'}</p>
         </div>
       </Show>
 
       <Show
-        when={!isLoading() && playlist()}
+        when={!playlistData.loading && playlist()}
         fallback={
           <div class="animate-pulse">
             <div class="flex gap-6 mb-8">
               <div class="w-56 h-56 bg-surface-secondary rounded-lg" />
               <div class="flex-1 pt-4">
-                <div class="h-8 bg-surface-secondary rounded w-1/2 mb-3" />
-                <div class="h-5 bg-surface-secondary rounded w-1/3 mb-6" />
-                <div class="h-4 bg-surface-secondary rounded w-1/4" />
+                <div class="h-8 bg-surface-secondary rounded-sm w-1/2 mb-3" />
+                <div class="h-5 bg-surface-secondary rounded-sm w-1/3 mb-6" />
+                <div class="h-4 bg-surface-secondary rounded-sm w-1/4" />
               </div>
             </div>
             <div class="space-y-2">
               <For each={Array(10).fill(0)}>
                 {() => (
                   <div class="flex items-center gap-4 p-3">
-                    <div class="w-10 h-10 bg-surface-secondary rounded" />
-                    <div class="flex-1 h-4 bg-surface-secondary rounded" />
-                    <div class="w-12 h-4 bg-surface-secondary rounded" />
+                    <div class="w-10 h-10 bg-surface-secondary rounded-sm" />
+                    <div class="flex-1 h-4 bg-surface-secondary rounded-sm" />
+                    <div class="w-12 h-4 bg-surface-secondary rounded-sm" />
                   </div>
                 )}
               </For>
@@ -253,7 +269,7 @@ const PlaylistPage: Component = () => {
                     <img
                       src={formatArtworkUrl(playlistData().attributes.artwork, 448)}
                       alt={playlistData().attributes.name}
-                      class="w-56 h-56 rounded-lg album-shadow"
+                      class="w-56 h-56 rounded-lg album-shadow-sm"
                     />
                   </Show>
                 </div>
@@ -330,6 +346,41 @@ const PlaylistPage: Component = () => {
                     <button
                       class="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full transition-smooth"
                       title="More Options"
+                      onClick={(e) => {
+                        const items: import('../ContextMenu/ContextMenu').MenuItem[] = [];
+                        if (!isInLibrary() && !isLibraryPlaylist()) {
+                          items.push({
+                            id: 'add-to-library',
+                            label: 'Add to Library',
+                            icon: '+',
+                            onClick: handleAddToLibrary,
+                          });
+                        }
+                        items.push({
+                          id: 'play-next',
+                          label: 'Play Next',
+                          icon: '▶',
+                          onClick: () => {
+                            if (playlist()) playerStore.addToQueue(playlist()!.id, true, 'playlist');
+                          },
+                        });
+                        items.push({
+                          id: 'add-to-queue',
+                          label: 'Add to Queue',
+                          icon: '☰',
+                          onClick: () => {
+                            if (playlist()) playerStore.addToQueue(playlist()!.id, false, 'playlist');
+                          },
+                        });
+                        items.push({ id: 'divider-1', label: '', divider: true });
+                        items.push({
+                          id: 'share',
+                          label: 'Copy Link',
+                          icon: '🔗',
+                          onClick: () => copyShareLink(playlist() as any),
+                        });
+                        contextMenu.show(e.clientX, e.clientY, items);
+                      }}
                     >
                       <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -361,9 +412,9 @@ const PlaylistPage: Component = () => {
                   const isPlaying = () => currentlyPlayingTrackId() === track.id;
 
                   return (
-                    <button
+                    <div
                       onClick={() => handlePlayTrack(index())}
-                      class={`w-full flex items-center gap-4 px-4 py-2 rounded-lg transition-smooth group text-left ${
+                      class={`w-full flex items-center gap-4 px-4 py-2 rounded-lg transition-smooth group cursor-pointer ${
                         isPlaying()
                           ? 'bg-white/10'
                           : 'hover:bg-white/5'
@@ -397,7 +448,7 @@ const PlaylistPage: Component = () => {
                         <Show
                           when={track.attributes.artwork}
                           fallback={
-                            <div class="w-full h-full bg-surface-secondary rounded flex items-center justify-center">
+                            <div class="w-full h-full bg-surface-secondary rounded-sm flex items-center justify-center">
                               <span class="text-white/20 text-xs">♫</span>
                             </div>
                           }
@@ -405,7 +456,7 @@ const PlaylistPage: Component = () => {
                           <img
                             src={formatArtworkUrl(track.attributes.artwork, 80)}
                             alt=""
-                            class="w-full h-full object-cover rounded"
+                            class="w-full h-full object-cover rounded-sm"
                           />
                         </Show>
                       </div>
@@ -415,7 +466,7 @@ const PlaylistPage: Component = () => {
                         <p class={`text-sm font-medium truncate ${isPlaying() ? 'text-apple-red' : 'text-white'}`}>
                           {track.attributes.name}
                           <Show when={track.attributes.isExplicit}>
-                            <span class="ml-2 px-1.5 py-0.5 text-[10px] bg-white/20 rounded uppercase">E</span>
+                            <span class="ml-2 px-1.5 py-0.5 text-[10px] bg-white/20 rounded-sm uppercase">E</span>
                           </Show>
                         </p>
                         <p class="text-xs text-white/60 truncate">
@@ -431,20 +482,23 @@ const PlaylistPage: Component = () => {
                       </div>
 
                       {/* Actions */}
-                      <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-smooth">
-                        <button
-                          class="p-1 text-white/60 hover:text-white"
-                          title="Add to Playlist"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
+                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-smooth">
+                        <HeartButton type="songs" id={track.id} size="sm" skipFetch />
                         <button
                           class="p-1 text-white/60 hover:text-white"
                           title="More"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const items = createTrackMenuItems(track as any, {
+                              onPlayNext: () => playerStore.addToQueue(track.id, true, track.type || 'song'),
+                              onAddToQueue: () => playerStore.addToQueue(track.id, false, track.type || 'song'),
+                              onShare: () => copyShareLink(track as any),
+                              onLove: () => ratingsStore.setRating('songs', track.id, 1),
+                              onRemoveLove: () => ratingsStore.setRating('songs', track.id, null),
+                              isLoved: ratingsStore.getRating('songs', track.id) === 1,
+                            });
+                            contextMenu.show(e.clientX, e.clientY, items);
+                          }}
                         >
                           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -456,7 +510,7 @@ const PlaylistPage: Component = () => {
                       <div class="w-16 text-right text-sm text-white/60">
                         {formatDuration(track.attributes.durationInMillis)}
                       </div>
-                    </button>
+                    </div>
                   );
                 }}
               </For>

@@ -11,6 +11,7 @@ import QueuePanel from './components/Queue/QueuePanel';
 import NowPlayingView from './components/NowPlaying/NowPlayingView';
 import { ContextMenuProvider } from './components/ContextMenu/ContextMenu';
 import { AddToPlaylistModalProvider } from './components/Modal/AddToPlaylistModal';
+import { ToastContainer } from './components/Toast/Toast';
 
 // Lazy load route components
 const ForYou = lazy(() => import('./components/ForYou/ForYou'));
@@ -23,7 +24,8 @@ const PlaylistPage = lazy(() => import('./components/Playlist/PlaylistPage'));
 const Library = lazy(() => import('./components/Library/Library'));
 const RecentlyPlayed = lazy(() => import('./components/Library/RecentlyPlayed'));
 const Playlists = lazy(() => import('./components/Library/Playlists'));
-const Lyrics = lazy(() => import('./components/Lyrics/Lyrics'));
+const RecentlyPlayedHistory = lazy(() => import('./components/Library/RecentlyPlayedHistory'));
+const PlayHistory = lazy(() => import('./components/Library/PlayHistory'));
 const Settings = lazy(() => import('./components/Settings/Settings'));
 
 const LoadingSpinner: Component = () => (
@@ -31,6 +33,7 @@ const LoadingSpinner: Component = () => (
     <div class="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
   </div>
 );
+
 
 const NotFoundPage: Component = () => (
   <div class="text-center py-20">
@@ -98,6 +101,9 @@ const AppLayout: Component<{ children?: any }> = (props) => {
             isOpen={isNowPlayingOpen()}
             onClose={() => setIsNowPlayingOpen(false)}
           />
+
+          {/* Toast Notifications */}
+          <ToastContainer />
         </div>
       </AddToPlaylistModalProvider>
     </ContextMenuProvider>
@@ -111,7 +117,6 @@ const App: Component = () => {
       <Route path="/browse" component={Browse} />
       <Route path="/radio" component={Radio} />
       <Route path="/search" component={Search} />
-      <Route path="/lyrics" component={Lyrics} />
       <Route path="/settings" component={Settings} />
       <Route path="/artist/:id" component={ArtistPage} />
       <Route path="/album/:id" component={AlbumPage} />
@@ -121,6 +126,8 @@ const App: Component = () => {
       <Route path="/library/albums" component={LibraryAlbumsPage} />
       <Route path="/library/songs" component={LibrarySongsPage} />
       <Route path="/library/playlists" component={Playlists} />
+      <Route path="/library/recently-played" component={RecentlyPlayedHistory} />
+      <Route path="/library/history" component={PlayHistory} />
       <Route path="*" component={NotFoundPage} />
     </Router>
   );

@@ -3,7 +3,6 @@
  * Handles global keyboard shortcuts and media keys
  */
 
-import { register, unregister, unregisterAll } from '@tauri-apps/plugin-global-shortcut';
 import { logger } from './logger';
 import { storageService } from './storage';
 
@@ -21,6 +20,7 @@ class KeyboardService {
   private shortcuts: Map<string, KeyboardShortcut> = new Map();
   private registeredKeys: Set<string> = new Set();
   private isEnabled = true;
+  private unlistenGlobalShortcut: (() => void) | null = null;
 
   async init(): Promise<void> {
     try {
@@ -37,6 +37,22 @@ class KeyboardService {
           shortcut.currentKey = key;
         }
       }
+
+      // Listen for global shortcut events from main process
+      this.unlistenGlobalShortcut = window.electron.onGlobalShortcutTriggered((accelerator: string) => {
+        // Find the shortcut with this key and execute its action
+        for (const shortcut of this.shortcuts.values()) {
+          if (shortcut.currentKey === accelerator) {
+            try {
+              shortcut.action();
+              logger.debug('keyboard', 'Shortcut executed', { id: shortcut.id });
+            } catch (error) {
+              logger.error('keyboard', 'Shortcut action failed', { id: shortcut.id, error });
+            }
+            break;
+          }
+        }
+      });
 
       if (this.isEnabled) {
         await this.registerAll();
@@ -66,7 +82,7 @@ class KeyboardService {
 
   async unregisterAll(): Promise<void> {
     try {
-      await unregisterAll();
+      await window.electron.unregisterAllShortcuts();
       this.registeredKeys.clear();
       logger.info('keyboard', 'All shortcuts unregistered');
     } catch (error) {
@@ -80,18 +96,13 @@ class KeyboardService {
     }
 
     try {
-      await register(shortcut.currentKey, async () => {
-        try {
-          await shortcut.action();
-          logger.debug('keyboard', 'Shortcut executed', { id: shortcut.id });
-        } catch (error) {
-          logger.error('keyboard', 'Shortcut action failed', { id: shortcut.id, error });
-        }
-      });
+      const success = await window.electron.registerShortcut(shortcut.currentKey);
 
-      this.registeredKeys.add(shortcut.currentKey);
-      logger.debug('keyboard', 'Shortcut registered', { id: shortcut.id, key: shortcut.currentKey });
-      return true;
+      if (success) {
+        this.registeredKeys.add(shortcut.currentKey);
+        logger.debug('keyboard', 'Shortcut registered', { id: shortcut.id, key: shortcut.currentKey });
+      }
+      return success;
     } catch (error) {
       logger.warn('keyboard', 'Failed to register shortcut', { id: shortcut.id, key: shortcut.currentKey, error });
       return false;
@@ -105,7 +116,7 @@ class KeyboardService {
     // Unregister old key
     if (this.registeredKeys.has(shortcut.currentKey)) {
       try {
-        await unregister(shortcut.currentKey);
+        await window.electron.unregisterShortcut(shortcut.currentKey);
         this.registeredKeys.delete(shortcut.currentKey);
       } catch (error) {
         logger.warn('keyboard', 'Failed to unregister old shortcut', { id, key: shortcut.currentKey });

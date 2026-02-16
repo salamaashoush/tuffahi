@@ -114,7 +114,7 @@ const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) => {
     <Show when={props.isOpen}>
       <Portal>
         <div
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs"
           onClick={(e) => e.target === e.currentTarget && props.onClose()}
           onKeyDown={handleKeyDown}
         >
@@ -163,7 +163,7 @@ const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) => {
                     placeholder="Playlist name"
                     value={newPlaylistName()}
                     onInput={(e) => setNewPlaylistName(e.currentTarget.value)}
-                    class="w-full px-4 py-3 bg-surface-secondary rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red mb-4"
+                    class="w-full px-4 py-3 bg-surface-secondary rounded-lg text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red mb-4"
                     autofocus
                   />
                   <div class="flex gap-3">
@@ -201,7 +201,7 @@ const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) => {
                     placeholder="Find a playlist"
                     value={searchQuery()}
                     onInput={(e) => setSearchQuery(e.currentTarget.value)}
-                    class="w-full pl-10 pr-4 py-2 bg-surface-secondary rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red"
+                    class="w-full pl-10 pr-4 py-2 bg-surface-secondary rounded-lg text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red"
                   />
                 </div>
 
@@ -237,11 +237,11 @@ const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) => {
                           disabled={isLoading()}
                           class="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-smooth disabled:opacity-50"
                         >
-                          <div class="w-10 h-10 rounded flex-shrink-0">
+                          <div class="w-10 h-10 rounded-sm flex-shrink-0">
                             <Show
                               when={playlist.attributes.artwork}
                               fallback={
-                                <div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 rounded flex items-center justify-center">
+                                <div class="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 rounded-sm flex items-center justify-center">
                                   <span class="text-white text-sm">♫</span>
                                 </div>
                               }
@@ -249,7 +249,7 @@ const AddToPlaylistModal: Component<AddToPlaylistModalProps> = (props) => {
                               <img
                                 src={formatArtworkUrl(playlist.attributes.artwork, 80)}
                                 alt=""
-                                class="w-full h-full object-cover rounded"
+                                class="w-full h-full object-cover rounded-sm"
                               />
                             </Show>
                           </div>

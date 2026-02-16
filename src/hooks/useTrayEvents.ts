@@ -1,28 +1,27 @@
 import { onMount, onCleanup } from 'solid-js';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { playerStore } from '../stores/player';
 
 /**
- * Hook to handle system tray events from Tauri
+ * Hook to handle system tray events from Electron main process
  */
 export function useTrayEvents() {
-  let unlistenPlayPause: UnlistenFn | undefined;
-  let unlistenNext: UnlistenFn | undefined;
-  let unlistenPrevious: UnlistenFn | undefined;
+  let unlistenPlayPause: (() => void) | undefined;
+  let unlistenNext: (() => void) | undefined;
+  let unlistenPrevious: (() => void) | undefined;
 
-  onMount(async () => {
+  onMount(() => {
     // Listen for play/pause from tray
-    unlistenPlayPause = await listen('tray-play-pause', () => {
+    unlistenPlayPause = window.electron.onTrayPlayPause(() => {
       playerStore.togglePlayPause();
     });
 
     // Listen for next track from tray
-    unlistenNext = await listen('tray-next', () => {
+    unlistenNext = window.electron.onTrayNext(() => {
       playerStore.skipNext();
     });
 
     // Listen for previous track from tray
-    unlistenPrevious = await listen('tray-previous', () => {
+    unlistenPrevious = window.electron.onTrayPrevious(() => {
       playerStore.skipPrevious();
     });
   });

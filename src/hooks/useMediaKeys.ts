@@ -132,3 +132,33 @@ export function updateMediaSessionMetadata(
     artwork,
   });
 }
+
+/**
+ * Update the Media Session playback state (drives MPRIS play/pause button)
+ */
+export function updateMediaSessionPlaybackState(isPlaying: boolean) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+}
+
+/**
+ * Update the Media Session position state (drives MPRIS seek bar / progress)
+ */
+export function updateMediaSessionPositionState(
+  duration: number,
+  position: number,
+  playbackRate: number = 1
+) {
+  if (!('mediaSession' in navigator)) return;
+  if (duration <= 0) return;
+
+  try {
+    navigator.mediaSession.setPositionState({
+      duration,
+      playbackRate,
+      position: Math.min(position, duration),
+    });
+  } catch {
+    // Some browsers throw if values are out of range
+  }
+}

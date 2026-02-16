@@ -1,4 +1,4 @@
-import { Component, createSignal, For, onMount, Show } from 'solid-js';
+import { Component, createResource, For, Show } from 'solid-js';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
 import { formatArtworkUrl } from '../../lib/musickit';
@@ -10,22 +10,13 @@ interface ChartData {
 }
 
 const Browse: Component = () => {
-  const [charts, setCharts] = createSignal<ChartData | null>(null);
-  const [isLoading, setIsLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-
-  onMount(async () => {
-    const mk = musicKitStore.instance();
-    if (!mk) return;
-
-    setIsLoading(true);
-
-    try {
-      const response = await mk.api.music('/v1/catalog/us/charts', {
+  const [charts] = createResource(
+    () => musicKitStore.instance(),
+    async (mk): Promise<ChartData> => {
+      const response = await mk.api.music('/v1/catalog/{{storefrontId}}/charts', {
         types: 'songs,albums,playlists',
         limit: 20,
       });
-
       const data = response.data as {
         results: {
           songs?: { data: MusicKit.MediaItem[] }[];
@@ -33,18 +24,13 @@ const Browse: Component = () => {
           playlists?: { data: MusicKit.MediaItem[] }[];
         };
       };
-
-      setCharts({
+      return {
         songs: data.results.songs?.[0]?.data || [],
         albums: data.results.albums?.[0]?.data || [],
         playlists: data.results.playlists?.[0]?.data || [],
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load charts');
-    } finally {
-      setIsLoading(false);
+      };
     }
-  });
+  );
 
   const handlePlaySong = (songId: string) => {
     playerStore.playSong(songId);
@@ -62,27 +48,27 @@ const Browse: Component = () => {
     <div class="space-y-10">
       <h1 class="text-3xl font-bold text-white">Browse</h1>
 
-      <Show when={error()}>
+      <Show when={charts.error}>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4">
-          <p class="text-red-400">{error()}</p>
+          <p class="text-red-400">{charts.error?.message || 'Failed to load charts'}</p>
         </div>
       </Show>
 
       <Show
-        when={!isLoading()}
+        when={!charts.loading}
         fallback={
           <div class="space-y-10">
             <For each={Array(3).fill(0)}>
               {() => (
                 <div>
-                  <div class="h-6 bg-surface-secondary rounded w-32 mb-4" />
+                  <div class="h-6 bg-surface-secondary rounded-sm w-32 mb-4" />
                   <div class="flex gap-4 overflow-hidden">
                     <For each={Array(6).fill(0)}>
                       {() => (
                         <div class="w-40 flex-shrink-0 animate-pulse">
                           <div class="aspect-square bg-surface-secondary rounded-lg mb-2" />
-                          <div class="h-4 bg-surface-secondary rounded w-3/4 mb-1" />
-                          <div class="h-3 bg-surface-secondary rounded w-1/2" />
+                          <div class="h-4 bg-surface-secondary rounded-sm w-3/4 mb-1" />
+                          <div class="h-3 bg-surface-secondary rounded-sm w-1/2" />
                         </div>
                       )}
                     </For>
@@ -114,7 +100,7 @@ const Browse: Component = () => {
                             <Show
                               when={song.attributes.artwork}
                               fallback={
-                                <div class="w-full h-full bg-surface-secondary rounded flex items-center justify-center">
+                                <div class="w-full h-full bg-surface-secondary rounded-sm flex items-center justify-center">
                                   <span class="text-white/20">♫</span>
                                 </div>
                               }
@@ -122,10 +108,10 @@ const Browse: Component = () => {
                               <img
                                 src={formatArtworkUrl(song.attributes.artwork, 96)}
                                 alt=""
-                                class="w-full h-full object-cover rounded"
+                                class="w-full h-full object-cover rounded-sm"
                               />
                             </Show>
-                            <div class="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                            <div class="absolute inset-0 bg-black/50 rounded-sm opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
                               <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M8 5v14l11-7z" />
                               </svg>
@@ -165,7 +151,7 @@ const Browse: Component = () => {
                               <img
                                 src={formatArtworkUrl(album.attributes.artwork, 320)}
                                 alt={album.attributes.name}
-                                class="w-full h-full object-cover rounded-lg album-shadow"
+                                class="w-full h-full object-cover rounded-lg album-shadow-sm"
                               />
                             </Show>
                             <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
@@ -208,7 +194,7 @@ const Browse: Component = () => {
                               <img
                                 src={formatArtworkUrl(playlist.attributes.artwork, 320)}
                                 alt={playlist.attributes.name}
-                                class="w-full h-full object-cover rounded-lg album-shadow"
+                                class="w-full h-full object-cover rounded-lg album-shadow-sm"
                               />
                             </Show>
                             <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">

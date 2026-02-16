@@ -1,4 +1,4 @@
-import { Component, createSignal, For, onMount, Show } from 'solid-js';
+import { Component, createResource, For, Show } from 'solid-js';
 import { useParams } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
@@ -25,49 +25,44 @@ interface ArtistDetails {
 
 const ArtistPage: Component = () => {
   const params = useParams<{ id: string }>();
-  const [data, setData] = createSignal<ArtistDetails | null>(null);
-  const [isLoading, setIsLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
 
-  onMount(async () => {
-    const mk = musicKitStore.instance();
-    if (!mk || !params.id) return;
-
-    try {
-      // Fetch artist details
+  const [data] = createResource(
+    () => {
+      const mk = musicKitStore.instance();
+      const id = params.id;
+      return mk && id ? { mk, id } : null;
+    },
+    async ({ mk, id }): Promise<ArtistDetails> => {
       const artistResponse = await mk.api.music(
-        `/v1/catalog/us/artists/${params.id}`,
+        `/v1/catalog/{{storefrontId}}/artists/${id}`,
         { include: 'albums' }
       );
 
       const artistData = artistResponse.data as { data: ArtistData[] };
-      const artist = artistData.data[0];
+      const artist = artistData.data?.[0];
+      if (!artist) throw new Error('Artist not found');
 
-      // Fetch top songs
-      const songsResponse = await mk.api.music(
-        `/v1/catalog/us/artists/${params.id}/view/top-songs`,
-        { limit: 10 }
-      );
+      const [songsResponse, albumsResponse] = await Promise.all([
+        mk.api.music(
+          `/v1/catalog/{{storefrontId}}/artists/${id}/view/top-songs`,
+          { limit: 10 }
+        ),
+        mk.api.music(
+          `/v1/catalog/{{storefrontId}}/artists/${id}/albums`,
+          { limit: 20 }
+        ),
+      ]);
+
       const songsData = songsResponse.data as { data: MusicKit.MediaItem[] };
-
-      // Fetch albums
-      const albumsResponse = await mk.api.music(
-        `/v1/catalog/us/artists/${params.id}/albums`,
-        { limit: 20 }
-      );
       const albumsData = albumsResponse.data as { data: MusicKit.MediaItem[] };
 
-      setData({
+      return {
         artist,
         topSongs: songsData.data || [],
         albums: albumsData.data || [],
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load artist');
-    } finally {
-      setIsLoading(false);
+      };
     }
-  });
+  );
 
   const handlePlaySong = (songId: string) => {
     playerStore.playSong(songId);
@@ -79,26 +74,26 @@ const ArtistPage: Component = () => {
 
   return (
     <div>
-      <Show when={error()}>
+      <Show when={data.error}>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4">
-          <p class="text-red-400">{error()}</p>
+          <p class="text-red-400">{data.error?.message || 'Failed to load artist'}</p>
         </div>
       </Show>
 
       <Show
-        when={!isLoading() && data()}
+        when={!data.loading && data()}
         fallback={
           <div class="animate-pulse">
             <div class="h-48 bg-surface-secondary rounded-xl mb-6" />
-            <div class="h-8 bg-surface-secondary rounded w-1/3 mb-8" />
+            <div class="h-8 bg-surface-secondary rounded-sm w-1/3 mb-8" />
             <div class="space-y-2">
               <For each={Array(5).fill(0)}>
                 {() => (
                   <div class="flex items-center gap-3 p-2">
-                    <div class="w-12 h-12 bg-surface-secondary rounded" />
+                    <div class="w-12 h-12 bg-surface-secondary rounded-sm" />
                     <div class="flex-1">
-                      <div class="h-4 bg-surface-secondary rounded w-1/3 mb-1" />
-                      <div class="h-3 bg-surface-secondary rounded w-1/4" />
+                      <div class="h-4 bg-surface-secondary rounded-sm w-1/3 mb-1" />
+                      <div class="h-3 bg-surface-secondary rounded-sm w-1/4" />
                     </div>
                   </div>
                 )}
@@ -156,7 +151,7 @@ const ArtistPage: Component = () => {
                           <Show
                             when={song.attributes.artwork}
                             fallback={
-                              <div class="w-full h-full bg-surface-secondary rounded flex items-center justify-center">
+                              <div class="w-full h-full bg-surface-secondary rounded-sm flex items-center justify-center">
                                 <span class="text-white/20">♫</span>
                               </div>
                             }
@@ -164,10 +159,10 @@ const ArtistPage: Component = () => {
                             <img
                               src={formatArtworkUrl(song.attributes.artwork, 96)}
                               alt=""
-                              class="w-full h-full object-cover rounded"
+                              class="w-full h-full object-cover rounded-sm"
                             />
                           </Show>
-                          <div class="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                          <div class="absolute inset-0 bg-black/50 rounded-sm opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
                             <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M8 5v14l11-7z" />
                             </svg>
@@ -207,7 +202,7 @@ const ArtistPage: Component = () => {
                             <img
                               src={formatArtworkUrl(album.attributes.artwork, 300)}
                               alt={album.attributes.name}
-                              class="w-full h-full object-cover rounded-lg album-shadow"
+                              class="w-full h-full object-cover rounded-lg album-shadow-sm"
                             />
                           </Show>
                           <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">

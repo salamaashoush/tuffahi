@@ -1,4 +1,5 @@
-import { Component, For, Show } from 'solid-js';
+import { Component, For, Show, onMount } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { libraryStore } from '../../stores/library';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
@@ -40,6 +41,9 @@ const Library: Component<LibraryProps> = (props) => {
         <Show when={view() === 'albums'}>
           <AlbumsView />
         </Show>
+        <Show when={view() === 'artists'}>
+          <ArtistsView />
+        </Show>
       </Show>
     </div>
   );
@@ -71,12 +75,12 @@ const SongsView: Component = () => {
               <For each={Array(10).fill(0)}>
                 {() => (
                   <div class="flex items-center gap-3 p-2 animate-pulse">
-                    <div class="w-10 h-10 bg-surface-secondary rounded" />
+                    <div class="w-10 h-10 bg-surface-secondary rounded-sm" />
                     <div class="flex-1">
-                      <div class="h-4 bg-surface-secondary rounded w-1/3 mb-1" />
-                      <div class="h-3 bg-surface-secondary rounded w-1/4" />
+                      <div class="h-4 bg-surface-secondary rounded-sm w-1/3 mb-1" />
+                      <div class="h-3 bg-surface-secondary rounded-sm w-1/4" />
                     </div>
-                    <div class="h-3 bg-surface-secondary rounded w-12" />
+                    <div class="h-3 bg-surface-secondary rounded-sm w-12" />
                   </div>
                 )}
               </For>
@@ -103,7 +107,7 @@ const SongsView: Component = () => {
                   <Show
                     when={song.attributes.artwork}
                     fallback={
-                      <div class="w-full h-full bg-surface-secondary rounded flex items-center justify-center">
+                      <div class="w-full h-full bg-surface-secondary rounded-sm flex items-center justify-center">
                         <span class="text-white/20">♫</span>
                       </div>
                     }
@@ -111,10 +115,10 @@ const SongsView: Component = () => {
                     <img
                       src={formatArtworkUrl(song.attributes.artwork, 80)}
                       alt=""
-                      class="w-full h-full object-cover rounded"
+                      class="w-full h-full object-cover rounded-sm"
                     />
                   </Show>
-                  <div class="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                  <div class="absolute inset-0 bg-black/50 rounded-sm opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
                     <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
@@ -177,8 +181,8 @@ const AlbumsView: Component = () => {
                 {() => (
                   <div class="animate-pulse">
                     <div class="aspect-square bg-surface-secondary rounded-lg mb-2" />
-                    <div class="h-4 bg-surface-secondary rounded w-3/4 mb-1" />
-                    <div class="h-3 bg-surface-secondary rounded w-1/2" />
+                    <div class="h-4 bg-surface-secondary rounded-sm w-3/4 mb-1" />
+                    <div class="h-3 bg-surface-secondary rounded-sm w-1/2" />
                   </div>
                 )}
               </For>
@@ -205,7 +209,7 @@ const AlbumsView: Component = () => {
                     <img
                       src={formatArtworkUrl(album.attributes.artwork, 300)}
                       alt={album.attributes.name}
-                      class="w-full h-full object-cover rounded-lg album-shadow"
+                      class="w-full h-full object-cover rounded-lg album-shadow-sm"
                     />
                   </Show>
 
@@ -226,6 +230,96 @@ const AlbumsView: Component = () => {
                 </p>
               </button>
             )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
+const ArtistsView: Component = () => {
+  const { state, fetchArtists } = libraryStore;
+  const navigate = useNavigate();
+
+  onMount(() => {
+    if (state().artists.length === 0) {
+      fetchArtists();
+    }
+  });
+
+  return (
+    <div>
+      <h2 class="text-2xl font-bold text-white mb-4">Artists</h2>
+
+      <Show
+        when={!state().isLoading && state().artists.length > 0}
+        fallback={
+          <Show
+            when={state().isLoading}
+            fallback={
+              <div class="text-center py-12">
+                <p class="text-white/40">No artists in your library</p>
+              </div>
+            }
+          >
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <For each={Array(10).fill(0)}>
+                {() => (
+                  <div class="animate-pulse flex flex-col items-center">
+                    <div class="w-32 h-32 bg-surface-secondary rounded-full mb-2" />
+                    <div class="h-4 bg-surface-secondary rounded-sm w-20" />
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+        }
+      >
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          <For each={state().artists}>
+            {(artist) => {
+              const catalogId = () => artist.relationships?.catalog?.data?.[0]?.id;
+
+              return (
+                <button
+                  onClick={() => {
+                    const cid = catalogId();
+                    if (cid) {
+                      navigate(`/artist/${cid}`);
+                    }
+                  }}
+                  class="group flex flex-col items-center text-center"
+                >
+                  <div class="relative w-32 h-32 mb-2">
+                    <Show
+                      when={artist.attributes?.artwork}
+                      fallback={
+                        <div class="w-full h-full bg-surface-secondary rounded-full flex items-center justify-center">
+                          <span class="text-4xl text-white/20">&#9835;</span>
+                        </div>
+                      }
+                    >
+                      <img
+                        src={formatArtworkUrl(artist.attributes.artwork, 256)}
+                        alt={artist.attributes.name}
+                        class="w-full h-full object-cover rounded-full"
+                      />
+                    </Show>
+                    <div class="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                      <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="text-sm font-medium text-white truncate max-w-[140px]">
+                    {artist.attributes?.name}
+                  </p>
+                </button>
+              );
+            }}
           </For>
         </div>
       </Show>

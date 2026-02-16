@@ -222,20 +222,20 @@ class ThemeService {
     const root = document.documentElement;
     const colors = theme.colors;
 
-    root.style.setProperty('--color-primary', colors.primary);
-    root.style.setProperty('--color-primary-hover', colors.primaryHover);
-    root.style.setProperty('--color-background', colors.background);
-    root.style.setProperty('--color-surface', colors.surface);
-    root.style.setProperty('--color-surface-secondary', colors.surfaceSecondary);
-    root.style.setProperty('--color-surface-tertiary', colors.surfaceTertiary);
-    root.style.setProperty('--color-text-primary', colors.textPrimary);
-    root.style.setProperty('--color-text-secondary', colors.textSecondary);
-    root.style.setProperty('--color-text-muted', colors.textMuted);
-    root.style.setProperty('--color-accent', colors.accent);
-    root.style.setProperty('--color-accent-hover', colors.accentHover);
-    root.style.setProperty('--color-success', colors.success);
-    root.style.setProperty('--color-warning', colors.warning);
-    root.style.setProperty('--color-error', colors.error);
+    root.style.setProperty('--theme-primary', colors.primary);
+    root.style.setProperty('--theme-primary-hover', colors.primaryHover);
+    root.style.setProperty('--theme-background', colors.background);
+    root.style.setProperty('--theme-surface', colors.surface);
+    root.style.setProperty('--theme-surface-secondary', colors.surfaceSecondary);
+    root.style.setProperty('--theme-surface-tertiary', colors.surfaceTertiary);
+    root.style.setProperty('--theme-text-primary', colors.textPrimary);
+    root.style.setProperty('--theme-text-secondary', colors.textSecondary);
+    root.style.setProperty('--theme-text-muted', colors.textMuted);
+    root.style.setProperty('--theme-accent', colors.accent);
+    root.style.setProperty('--theme-accent-hover', colors.accentHover);
+    root.style.setProperty('--theme-success', colors.success);
+    root.style.setProperty('--theme-warning', colors.warning);
+    root.style.setProperty('--theme-error', colors.error);
 
     // Save preference
     await storageService.saveSettings({ themeId: theme.id });

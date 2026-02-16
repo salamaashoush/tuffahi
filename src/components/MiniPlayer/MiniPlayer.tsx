@@ -1,78 +1,84 @@
 import { Component, Show, createSignal, onMount, onCleanup } from 'solid-js';
-import { invoke } from '@tauri-apps/api/core';
-import { playerStore } from '../../stores/player';
-import { formatArtworkUrl } from '../../lib/musickit';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+
+interface MiniPlayerState {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  trackName: string;
+  artistName: string;
+  artworkUrl: string;
+}
 
 const MiniPlayer: Component = () => {
-  const { state, togglePlayPause, skipNext, skipPrevious } = playerStore;
-  const [isDragging, setIsDragging] = createSignal(false);
-
-  onMount(async () => {
-    // Make the window draggable by the whole surface
-    const appWindow = getCurrentWindow();
-
-    // Set up window drag on mousedown
-    const handleMouseDown = async (e: MouseEvent) => {
-      // Only drag if clicking on the background, not buttons
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'BUTTON' || target.closest('button')) {
-        return;
-      }
-      setIsDragging(true);
-      await appWindow.startDragging();
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    onCleanup(() => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
-    });
+  const [state, setState] = createSignal<MiniPlayerState>({
+    isPlaying: false,
+    currentTime: 0,
+    duration: 0,
+    trackName: '',
+    artistName: '',
+    artworkUrl: '',
   });
+
+  onMount(() => {
+    const unlisten = window.electron.onPlayerStateUpdate((newState: unknown) => {
+      setState(newState as MiniPlayerState);
+    });
+
+    onCleanup(unlisten);
+  });
+
+  let commandLock = false;
+  const sendCommand = async (cmd: string) => {
+    if (commandLock) return;
+    commandLock = true;
+    try {
+      await window.electron.miniPlayerCommand(cmd);
+    } catch (err) {
+      console.error('[MiniPlayer] Command failed:', cmd, err);
+    } finally {
+      // Prevent rapid-fire commands — wait for MusicKit to settle
+      setTimeout(() => { commandLock = false; }, 300);
+    }
+  };
 
   const handleClose = async () => {
     try {
-      await invoke('show_main_window');
-    } catch (err) {
-      console.error('Failed to show main window:', err);
-    }
-    const appWindow = getCurrentWindow();
-    await appWindow.close();
+      await window.electron.showMainWindow();
+    } catch {}
+    await window.electron.closeMiniPlayer();
   };
 
   const handleExpand = async () => {
     try {
-      await invoke('show_main_window');
-      const appWindow = getCurrentWindow();
-      await appWindow.close();
-    } catch (err) {
-      console.error('Failed to expand:', err);
-    }
+      await window.electron.showMainWindow();
+      await window.electron.closeMiniPlayer();
+    } catch {}
   };
 
-  const nowPlaying = () => state().nowPlaying;
+  const progress = () => {
+    const s = state();
+    if (s.duration <= 0) return 0;
+    return (s.currentTime / s.duration) * 100;
+  };
 
   return (
-    <div class="h-screen w-screen bg-surface/95 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 flex flex-col cursor-move select-none">
+    <div
+      class="h-screen w-screen bg-surface/95 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 flex flex-col select-none"
+      style={{ "-webkit-app-region": "drag" }}
+    >
       {/* Album Art */}
       <div class="relative flex-1 min-h-0">
         <Show
-          when={nowPlaying()?.attributes?.artwork}
+          when={state().artworkUrl}
           fallback={
             <div class="w-full h-full bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center">
-              <span class="text-6xl text-white/80">♫</span>
+              <span class="text-6xl text-white/80">&#9835;</span>
             </div>
           }
         >
           <img
-            src={formatArtworkUrl(nowPlaying()!.attributes.artwork, 300)}
-            alt={nowPlaying()!.attributes.name}
+            src={state().artworkUrl}
+            alt={state().trackName}
             class="w-full h-full object-cover"
           />
         </Show>
@@ -81,6 +87,7 @@ const MiniPlayer: Component = () => {
         <button
           onClick={handleExpand}
           class="absolute top-2 left-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors cursor-pointer"
+          style={{ "-webkit-app-region": "no-drag" }}
           title="Expand to full window"
         >
           <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -92,6 +99,7 @@ const MiniPlayer: Component = () => {
         <button
           onClick={handleClose}
           class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors cursor-pointer"
+          style={{ "-webkit-app-region": "no-drag" }}
           title="Close mini player"
         >
           <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -99,24 +107,24 @@ const MiniPlayer: Component = () => {
           </svg>
         </button>
 
-        {/* Gradient overlay for text */}
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        {/* Gradient overlay for text — pointer-events-none so buttons remain clickable */}
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
       </div>
 
       {/* Track Info & Controls */}
-      <div class="p-3 bg-surface">
+      <div class="p-3 bg-surface" style={{ "-webkit-app-region": "no-drag" }}>
         <Show
-          when={nowPlaying()}
+          when={state().trackName}
           fallback={
             <p class="text-sm text-white/60 text-center">Not Playing</p>
           }
         >
           <div class="text-center mb-3">
             <p class="text-sm font-medium text-white truncate">
-              {nowPlaying()!.attributes.name}
+              {state().trackName}
             </p>
             <p class="text-xs text-white/60 truncate">
-              {nowPlaying()!.attributes.artistName}
+              {state().artistName}
             </p>
           </div>
         </Show>
@@ -124,7 +132,7 @@ const MiniPlayer: Component = () => {
         {/* Controls */}
         <div class="flex items-center justify-center gap-4">
           <button
-            onClick={() => skipPrevious()}
+            onClick={() => sendCommand('skipPrevious')}
             class="text-white/60 hover:text-white transition-smooth cursor-pointer"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -133,7 +141,7 @@ const MiniPlayer: Component = () => {
           </button>
 
           <button
-            onClick={() => togglePlayPause()}
+            onClick={() => sendCommand('togglePlayPause')}
             class="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
           >
             <Show
@@ -151,7 +159,7 @@ const MiniPlayer: Component = () => {
           </button>
 
           <button
-            onClick={() => skipNext()}
+            onClick={() => sendCommand('skipNext')}
             class="text-white/60 hover:text-white transition-smooth cursor-pointer"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -164,9 +172,7 @@ const MiniPlayer: Component = () => {
         <div class="mt-3 h-1 bg-white/20 rounded-full overflow-hidden">
           <div
             class="h-full bg-apple-red transition-all"
-            style={{
-              width: `${state().duration > 0 ? (state().currentTime / state().duration) * 100 : 0}%`,
-            }}
+            style={{ width: `${progress()}%` }}
           />
         </div>
       </div>

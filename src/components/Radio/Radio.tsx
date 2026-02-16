@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, For, Show } from 'solid-js';
+import { Component, createResource, createSignal, For, Show } from 'solid-js';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
 import { formatArtworkUrl } from '../../lib/musickit';
@@ -17,68 +17,43 @@ interface Station {
   };
 }
 
+interface RadioData {
+  liveStations: Station[];
+  featuredStations: Station[];
+  genreStations: Station[];
+}
+
 const Radio: Component = () => {
-  const [liveStations, setLiveStations] = createSignal<Station[]>([]);
-  const [featuredStations, setFeaturedStations] = createSignal<Station[]>([]);
-  const [genreStations, setGenreStations] = createSignal<Station[]>([]);
-  const [isLoading, setIsLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = createSignal<string | null>(null);
 
-  onMount(async () => {
-    const mk = musicKitStore.instance();
-    if (!mk) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // Fetch different types of stations
+  const [radioData] = createResource(
+    () => musicKitStore.instance(),
+    async (mk): Promise<RadioData> => {
+      // Fetch Apple Music 1, Hits, Country (known live station IDs)
+      const knownLiveIds = ['ra.978484891', 'ra.1498157166', 'ra.1498157150'];
       const [liveResponse, featuredResponse] = await Promise.all([
-        // Apple Music 1, Apple Music Hits, Apple Music Country
-        mk.api.music('/v1/catalog/us/stations', {
-          'filter[featured]': 'apple-music-live-stations',
-          limit: 10,
+        mk.api.music(`/v1/catalog/{{storefrontId}}/stations`, {
+          ids: knownLiveIds.join(','),
         }).catch(() => null),
-        // Featured stations
-        mk.api.music('/v1/catalog/us/stations', {
-          limit: 20,
+        mk.api.music('/v1/catalog/{{storefrontId}}/search', {
+          term: 'station',
+          types: 'stations',
+          limit: 25,
         }).catch(() => null),
       ]);
 
-      if (liveResponse) {
-        const data = liveResponse.data as { data: Station[] };
-        setLiveStations(data.data || []);
-      }
+      const liveStations: Station[] = liveResponse
+        ? ((liveResponse.data as { data: Station[] }).data || [])
+        : [];
 
-      if (featuredResponse) {
-        const data = featuredResponse.data as { data: Station[] };
-        // Filter out live stations from featured
-        const liveIds = new Set(liveStations().map((s) => s.id));
-        setFeaturedStations(data.data.filter((s) => !liveIds.has(s.id)) || []);
-      }
+      const liveIds = new Set(liveStations.map((s) => s.id));
+      const featuredStations: Station[] = featuredResponse
+        ? ((featuredResponse.data as { results?: { stations?: { data: Station[] } } }).results?.stations?.data || []).filter((s) => !liveIds.has(s.id))
+        : [];
 
-      // Try to get genre stations
-      try {
-        const genreResponse = await mk.api.music('/v1/catalog/us/charts', {
-          types: 'stations',
-          limit: 20,
-        });
-        const data = genreResponse.data as {
-          results: { stations?: { data: Station[] }[] };
-        };
-        if (data.results.stations?.[0]?.data) {
-          setGenreStations(data.results.stations[0].data);
-        }
-      } catch {
-        // Genre stations not available
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load stations');
-    } finally {
-      setIsLoading(false);
+      return { liveStations, featuredStations, genreStations: [] };
     }
-  });
+  );
 
   const handlePlayStation = async (station: Station) => {
     const mk = musicKitStore.instance();
@@ -105,18 +80,18 @@ const Radio: Component = () => {
         <p class="text-white/60">The best way to discover new music</p>
       </div>
 
-      <Show when={error()}>
+      <Show when={radioData.error}>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4">
-          <p class="text-red-400">{error()}</p>
+          <p class="text-red-400">{radioData.error?.message || 'Failed to load stations'}</p>
         </div>
       </Show>
 
       <Show
-        when={!isLoading()}
+        when={!radioData.loading}
         fallback={
           <div class="space-y-10">
             <div>
-              <div class="h-6 bg-surface-secondary rounded w-48 mb-4 animate-pulse" />
+              <div class="h-6 bg-surface-secondary rounded-sm w-48 mb-4 animate-pulse" />
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <For each={Array(3).fill(0)}>
                   {() => (
@@ -129,7 +104,7 @@ const Radio: Component = () => {
         }
       >
         {/* Apple Music Live Stations */}
-        <Show when={liveStations().length > 0}>
+        <Show when={(radioData()?.liveStations?.length ?? 0) > 0}>
           <section>
             <div class="flex items-center gap-2 mb-4">
               <h2 class="text-xl font-semibold text-white">Apple Music Radio</h2>
@@ -138,7 +113,7 @@ const Radio: Component = () => {
               </span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <For each={liveStations()}>
+              <For each={radioData()?.liveStations}>
                 {(station) => (
                   <LiveStationCard
                     station={station}
@@ -152,11 +127,11 @@ const Radio: Component = () => {
         </Show>
 
         {/* Featured Stations */}
-        <Show when={featuredStations().length > 0}>
+        <Show when={(radioData()?.featuredStations?.length ?? 0) > 0}>
           <section>
             <h2 class="text-xl font-semibold text-white mb-4">Featured Stations</h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              <For each={featuredStations()}>
+              <For each={radioData()?.featuredStations}>
                 {(station) => (
                   <StationCard
                     station={station}
@@ -170,11 +145,11 @@ const Radio: Component = () => {
         </Show>
 
         {/* Genre Stations */}
-        <Show when={genreStations().length > 0}>
+        <Show when={(radioData()?.genreStations?.length ?? 0) > 0}>
           <section>
             <h2 class="text-xl font-semibold text-white mb-4">Stations by Genre</h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              <For each={genreStations()}>
+              <For each={radioData()?.genreStations}>
                 {(station) => (
                   <StationCard
                     station={station}
@@ -188,7 +163,7 @@ const Radio: Component = () => {
         </Show>
 
         {/* Empty State */}
-        <Show when={liveStations().length === 0 && featuredStations().length === 0 && genreStations().length === 0 && !error()}>
+        <Show when={!radioData()?.liveStations?.length && !radioData()?.featuredStations?.length && !radioData()?.genreStations?.length && !radioData.error}>
           <div class="flex flex-col items-center justify-center py-20">
             <div class="w-20 h-20 rounded-full bg-surface-secondary flex items-center justify-center mb-4">
               <svg class="w-10 h-10 text-white/20" fill="currentColor" viewBox="0 0 24 24">

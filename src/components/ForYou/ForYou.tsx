@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount, For, Show } from 'solid-js';
+import { Component, createResource, For, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
@@ -38,52 +38,32 @@ interface HeavyRotation {
   };
 }
 
+interface ForYouData {
+  recommendations: Recommendation[];
+  heavyRotation: HeavyRotation[];
+  recentlyPlayed: HeavyRotation[];
+}
+
 const ForYou: Component = () => {
-  const [recommendations, setRecommendations] = createSignal<Recommendation[]>([]);
-  const [heavyRotation, setHeavyRotation] = createSignal<HeavyRotation[]>([]);
-  const [recentlyPlayed, setRecentlyPlayed] = createSignal<HeavyRotation[]>([]);
-  const [isLoading, setIsLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
-
-  onMount(async () => {
-    if (!musicKitStore.isAuthorized()) {
-      setIsLoading(false);
-      return;
-    }
-
-    const mk = musicKitStore.instance();
-    if (!mk) return;
-
-    setIsLoading(true);
-
-    try {
-      // Fetch recommendations
+  const [forYouData] = createResource(
+    () => {
+      const mk = musicKitStore.instance();
+      const isAuthed = musicKitStore.isAuthorized();
+      return isAuthed && mk ? mk : null;
+    },
+    async (mk): Promise<ForYouData> => {
       const [recsResponse, heavyResponse, recentResponse] = await Promise.all([
         mk.api.music('/v1/me/recommendations', { limit: 10 }).catch(() => null),
         mk.api.music('/v1/me/history/heavy-rotation', { limit: 10 }).catch(() => null),
         mk.api.music('/v1/me/recent/played', { limit: 10 }).catch(() => null),
       ]);
-
-      if (recsResponse) {
-        const data = recsResponse.data as { data: Recommendation[] };
-        setRecommendations(data.data || []);
-      }
-
-      if (heavyResponse) {
-        const data = heavyResponse.data as { data: HeavyRotation[] };
-        setHeavyRotation(data.data || []);
-      }
-
-      if (recentResponse) {
-        const data = recentResponse.data as { data: HeavyRotation[] };
-        setRecentlyPlayed(data.data || []);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load recommendations');
-    } finally {
-      setIsLoading(false);
+      return {
+        recommendations: recsResponse ? ((recsResponse.data as { data: Recommendation[] }).data || []) : [],
+        heavyRotation: heavyResponse ? ((heavyResponse.data as { data: HeavyRotation[] }).data || []) : [],
+        recentlyPlayed: recentResponse ? ((recentResponse.data as { data: HeavyRotation[] }).data || []) : [],
+      };
     }
-  });
+  );
 
   const handlePlay = (type: string, id: string) => {
     playerStore.playMedia(type, id);
@@ -128,27 +108,27 @@ const ForYou: Component = () => {
           </div>
         }
       >
-        <Show when={error()}>
+        <Show when={forYouData.error}>
           <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4">
-            <p class="text-red-400">{error()}</p>
+            <p class="text-red-400">{forYouData.error?.message || 'Failed to load recommendations'}</p>
           </div>
         </Show>
 
         <Show
-          when={!isLoading()}
+          when={!forYouData.loading}
           fallback={
             <div class="space-y-10">
               <For each={Array(3).fill(0)}>
                 {() => (
                   <div>
-                    <div class="h-6 bg-surface-secondary rounded w-48 mb-4" />
+                    <div class="h-6 bg-surface-secondary rounded-sm w-48 mb-4" />
                     <div class="flex gap-4 overflow-hidden">
                       <For each={Array(6).fill(0)}>
                         {() => (
                           <div class="w-44 flex-shrink-0 animate-pulse">
                             <div class="aspect-square bg-surface-secondary rounded-lg mb-2" />
-                            <div class="h-4 bg-surface-secondary rounded w-3/4 mb-1" />
-                            <div class="h-3 bg-surface-secondary rounded w-1/2" />
+                            <div class="h-4 bg-surface-secondary rounded-sm w-3/4 mb-1" />
+                            <div class="h-3 bg-surface-secondary rounded-sm w-1/2" />
                           </div>
                         )}
                       </For>
@@ -175,7 +155,7 @@ const ForYou: Component = () => {
                       id={item.id}
                       type={item.type}
                       name={item.attributes.name}
-                      subtitle={item.attributes.artistName}
+                      subtitle={item.attributes.artistName ?? ''}
                       artwork={item.attributes.artwork}
                       onPlay={() => handlePlay(item.type, item.id)}
                     />
@@ -186,11 +166,11 @@ const ForYou: Component = () => {
           </Show>
 
           {/* Heavy Rotation */}
-          <Show when={heavyRotation().length > 0}>
+          <Show when={(forYouData()?.heavyRotation?.length ?? 0) > 0}>
             <section>
               <h2 class="text-xl font-semibold text-white mb-4">Heavy Rotation</h2>
               <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                <For each={heavyRotation()}>
+                <For each={forYouData()?.heavyRotation}>
                   {(item) => (
                     <MediaCard
                       id={item.id}
@@ -207,11 +187,11 @@ const ForYou: Component = () => {
           </Show>
 
           {/* Recently Played */}
-          <Show when={recentlyPlayed().length > 0}>
+          <Show when={(forYouData()?.recentlyPlayed?.length ?? 0) > 0}>
             <section>
               <h2 class="text-xl font-semibold text-white mb-4">Recently Played</h2>
               <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                <For each={recentlyPlayed()}>
+                <For each={forYouData()?.recentlyPlayed}>
                   {(item) => (
                     <MediaCard
                       id={item.id}
@@ -228,7 +208,7 @@ const ForYou: Component = () => {
           </Show>
 
           {/* Personalized Recommendations */}
-          <For each={recommendations()}>
+          <For each={forYouData()?.recommendations}>
             {(rec) => (
               <Show when={rec.relationships?.contents?.data && rec.relationships.contents.data.length > 0}>
                 <section>
@@ -317,7 +297,7 @@ const MediaCard: Component<MediaCardProps> = (props) => {
             <img
               src={formatArtworkUrl(props.artwork, 352)}
               alt={props.name}
-              class="w-full h-full object-cover rounded-lg album-shadow"
+              class="w-full h-full object-cover rounded-lg album-shadow-sm"
             />
           </Show>
 

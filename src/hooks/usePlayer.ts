@@ -3,6 +3,8 @@ import { playerStore } from '../stores/player';
 export function usePlayer() {
   return {
     state: playerStore.state,
+    currentTime: playerStore.currentTime,
+    duration: playerStore.duration,
     play: playerStore.play,
     pause: playerStore.pause,
     togglePlayPause: playerStore.togglePlayPause,
