@@ -101,9 +101,7 @@ class StorageService {
     const stored = await this.dbGet<AppSettings>(STORES.SETTINGS, 'app-settings');
     return {
       audioQuality: 'high',
-      crossfade: false,
-      crossfadeDuration: 6,
-      showLyrics: true,
+      autoplay: true,
       notifications: true,
       miniPlayerOnClose: false,
       startOnLogin: false,
@@ -158,15 +156,38 @@ class StorageService {
   }
 
   // Play History
-  async getPlayHistory(): Promise<Array<{ id: string; type: string; playedAt: number }>> {
-    const stored = await this.dbGet<Array<{ id: string; type: string; playedAt: number }>>(STORES.PLAY_HISTORY, 'history');
+  async getPlayHistory(): Promise<Array<{
+    id: string;
+    type: string;
+    playedAt: number;
+    name?: string;
+    artistName?: string;
+    artworkUrl?: string;
+    durationMs?: number;
+  }>> {
+    const stored = await this.dbGet<Array<{
+      id: string;
+      type: string;
+      playedAt: number;
+      name?: string;
+      artistName?: string;
+      artworkUrl?: string;
+      durationMs?: number;
+    }>>(STORES.PLAY_HISTORY, 'history');
     return stored || [];
   }
 
-  async addToPlayHistory(id: string, type: string): Promise<void> {
+  async addToPlayHistory(entry: {
+    id: string;
+    type: string;
+    name?: string;
+    artistName?: string;
+    artworkUrl?: string;
+    durationMs?: number;
+  }): Promise<void> {
     const history = await this.getPlayHistory();
-    const filtered = history.filter(h => h.id !== id);
-    const updated = [{ id, type, playedAt: Date.now() }, ...filtered].slice(0, 100);
+    const filtered = history.filter(h => h.id !== entry.id);
+    const updated = [{ ...entry, playedAt: Date.now() }, ...filtered].slice(0, 100);
     await this.dbSet(STORES.PLAY_HISTORY, 'history', updated);
   }
 

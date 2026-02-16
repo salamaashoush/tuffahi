@@ -3,7 +3,7 @@
  * Export all services from a single entry point
  */
 
-export { api, searchAPI, catalogAPI, libraryAPI, personalizedAPI, lyricsAPI, radioAPI, playlistAPI, APIError } from './api';
+export { api, searchAPI, catalogAPI, libraryAPI, personalizedAPI, radioAPI, playlistAPI, APIError } from './api';
 export { cacheService } from './cache';
 export { logger } from './logger';
 export { storageService } from './storage';

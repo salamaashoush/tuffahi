@@ -37,6 +37,7 @@ declare namespace MusicKit {
     readonly storefrontId: string;
     readonly storefrontCountryCode: string;
     playbackState: PlaybackStates;
+    bitrate: PlaybackBitrate;
     nowPlayingItem: MediaItem | null;
     queue: Queue;
     volume: number;
@@ -298,6 +299,8 @@ declare namespace MusicKit {
     type: 'library-playlists';
   }
 
+  type LibraryResource = LibrarySong | LibraryAlbum | LibraryPlaylist;
+
   // Queue
   interface Queue {
     items: MediaItem[];
@@ -454,22 +457,6 @@ declare namespace MusicKit {
     };
   }
 
-  // Lyrics
-  interface Lyrics {
-    data: LyricsData[];
-  }
-
-  interface LyricsData {
-    id: string;
-    type: 'lyrics';
-    attributes: LyricsAttributes;
-  }
-
-  interface LyricsAttributes {
-    ttml: string;
-    playParams: PlayParameters;
-  }
-
   // Storefront
   interface Storefront {
     id: string;
@@ -514,5 +501,3 @@ declare namespace MusicKit {
   }
 }
 
-export type { MusicKit };
-export default MusicKit;

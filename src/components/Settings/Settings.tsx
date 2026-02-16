@@ -1,15 +1,12 @@
 import { Component, Show, createSignal, onMount } from 'solid-js';
 import { Palette } from 'lucide-solid';
 import { musicKitStore } from '../../stores/musickit';
-import { invoke } from '@tauri-apps/api/core';
 import { themeService } from '../../services/themes';
 import ThemeCustomizer from '../ThemeCustomizer/ThemeCustomizer';
 
 interface SettingsState {
-  audioQuality: 'high' | 'lossless' | 'dolby';
-  crossfade: boolean;
-  crossfadeDuration: number;
-  showLyrics: boolean;
+  audioQuality: 'standard' | 'high';
+  autoplay: boolean;
   notifications: boolean;
   miniPlayerOnClose: boolean;
   startOnLogin: boolean;
@@ -18,9 +15,7 @@ interface SettingsState {
 const Settings: Component = () => {
   const [settings, setSettings] = createSignal<SettingsState>({
     audioQuality: 'high',
-    crossfade: false,
-    crossfadeDuration: 6,
-    showLyrics: true,
+    autoplay: true,
     notifications: true,
     miniPlayerOnClose: false,
     startOnLogin: false,
@@ -33,7 +28,7 @@ const Settings: Component = () => {
   onMount(async () => {
     // Check if MusicKit is properly configured
     try {
-      const configured = await invoke<boolean>('is_musickit_configured');
+      const configured = await window.electron.isMusicKitConfigured();
       setIsMusicKitConfigured(configured);
     } catch {
       setIsMusicKitConfigured(false);
@@ -48,6 +43,33 @@ const Settings: Component = () => {
       } catch {
         // Ignore parse errors
       }
+    }
+
+    // Sync open-at-login from Electron (source of truth)
+    try {
+      const openAtLogin = await window.electron.getOpenAtLogin();
+      setSettings((prev) => {
+        const updated = { ...prev, startOnLogin: openAtLogin };
+        localStorage.setItem('app-settings', JSON.stringify(updated));
+        return updated;
+      });
+    } catch {
+      // Ignore — may fail in dev
+    }
+
+    // Sync close behavior to main process from localStorage
+    try {
+      await window.electron.setCloseBehavior(settings().miniPlayerOnClose);
+    } catch {
+      // Ignore
+    }
+
+    // Apply audio quality to MusicKit
+    try {
+      const mk = musicKitStore.instance() as any;
+      if (mk) mk.bitrate = settings().audioQuality === 'high' ? 256 : 64;
+    } catch {
+      // Ignore
     }
 
     // Listen for theme changes
@@ -75,15 +97,12 @@ const Settings: Component = () => {
       {/* Account Section */}
       <section class="mb-8">
         <h2 class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Account</h2>
-        <div class="bg-surface-secondary rounded-xl overflow-hidden">
+        <div class="bg-surface-secondary rounded-xl overflow-hidden divide-y divide-white/10">
           <div class="p-4 flex items-center justify-between">
             <div>
               <p class="text-white font-medium">Apple Music</p>
               <p class="text-sm text-white/60">
-                {musicKitStore.isAuthorized()
-                  ? 'Signed in with Apple ID'
-                  : 'Not signed in'
-                }
+                {musicKitStore.isAuthorized() ? 'Signed in' : 'Not signed in'}
               </p>
             </div>
             <Show
@@ -106,7 +125,23 @@ const Settings: Component = () => {
             </Show>
           </div>
 
-                  </div>
+          <Show when={musicKitStore.isAuthorized() && musicKitStore.storefrontName()}>
+            <div class="p-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-white font-medium">Region</p>
+                  <p class="text-sm text-white/60">Your Apple Music storefront</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-white">{musicKitStore.storefrontName()}</p>
+                  <Show when={musicKitStore.storefrontId()}>
+                    <p class="text-xs text-white/40 uppercase">{musicKitStore.storefrontId()}</p>
+                  </Show>
+                </div>
+              </div>
+            </div>
+          </Show>
+        </div>
       </section>
 
       {/* Playback Section */}
@@ -118,71 +153,49 @@ const Settings: Component = () => {
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-white font-medium">Audio Quality</p>
-                <p class="text-sm text-white/60">Choose streaming quality</p>
+                <p class="text-sm text-white/60">Choose streaming bitrate</p>
               </div>
               <select
                 value={settings().audioQuality}
-                onChange={(e) => updateSetting('audioQuality', e.currentTarget.value as SettingsState['audioQuality'])}
-                class="px-3 py-2 bg-surface-tertiary rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-apple-red cursor-pointer"
+                onChange={(e) => {
+                  const value = e.currentTarget.value as SettingsState['audioQuality'];
+                  updateSetting('audioQuality', value);
+                  const mk = musicKitStore.instance() as any;
+                  if (mk) mk.bitrate = value === 'high' ? 256 : 64;
+                }}
+                class="px-3 py-2 bg-surface-tertiary rounded-lg text-white text-sm focus:outline-hidden focus:ring-2 focus:ring-apple-red cursor-pointer"
                 style={{ "color-scheme": "dark" }}
               >
                 <option value="high" class="bg-surface-tertiary text-white">High Quality (256 kbps)</option>
-                <option value="lossless" class="bg-surface-tertiary text-white">Lossless (ALAC)</option>
-                <option value="dolby" class="bg-surface-tertiary text-white">Dolby Atmos</option>
+                <option value="standard" class="bg-surface-tertiary text-white">Standard (64 kbps)</option>
               </select>
             </div>
           </div>
 
-          {/* Crossfade */}
-          <div class="p-4">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <p class="text-white font-medium">Crossfade</p>
-                <p class="text-sm text-white/60">Blend tracks together</p>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings().crossfade}
-                  onChange={(e) => updateSetting('crossfade', e.currentTarget.checked)}
-                  class="sr-only peer"
-                />
-                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
-              </label>
-            </div>
-            <Show when={settings().crossfade}>
-              <div class="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="1"
-                  max="12"
-                  value={settings().crossfadeDuration}
-                  onInput={(e) => updateSetting('crossfadeDuration', parseInt(e.currentTarget.value))}
-                  class="flex-1 accent-apple-red"
-                />
-                <span class="text-sm text-white/60 w-16">{settings().crossfadeDuration}s</span>
-              </div>
-            </Show>
-          </div>
-
-          {/* Lyrics */}
+          {/* Autoplay */}
           <div class="p-4">
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-white font-medium">Show Lyrics</p>
-                <p class="text-sm text-white/60">Display synced lyrics when available</p>
+                <p class="text-white font-medium">Autoplay</p>
+                <p class="text-sm text-white/60">Continue playing similar music when queue ends</p>
               </div>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings().showLyrics}
-                  onChange={(e) => updateSetting('showLyrics', e.currentTarget.checked)}
+                  checked={settings().autoplay}
+                  onChange={(e) => {
+                    updateSetting('autoplay', e.currentTarget.checked);
+                    // Apply to MusicKit instance
+                    const mk = musicKitStore.instance() as any;
+                    if (mk) mk.autoplayEnabled = e.currentTarget.checked;
+                  }}
                   class="sr-only peer"
                 />
-                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
+                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
               </label>
             </div>
           </div>
+
         </div>
       </section>
 
@@ -227,7 +240,7 @@ const Settings: Component = () => {
                   onChange={(e) => updateSetting('notifications', e.currentTarget.checked)}
                   class="sr-only peer"
                 />
-                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
+                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
               </label>
             </div>
           </div>
@@ -248,10 +261,14 @@ const Settings: Component = () => {
                 <input
                   type="checkbox"
                   checked={settings().miniPlayerOnClose}
-                  onChange={(e) => updateSetting('miniPlayerOnClose', e.currentTarget.checked)}
+                  onChange={(e) => {
+                    const value = e.currentTarget.checked;
+                    updateSetting('miniPlayerOnClose', value);
+                    window.electron.setCloseBehavior(value);
+                  }}
                   class="sr-only peer"
                 />
-                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
+                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
               </label>
             </div>
           </div>
@@ -266,10 +283,14 @@ const Settings: Component = () => {
                 <input
                   type="checkbox"
                   checked={settings().startOnLogin}
-                  onChange={(e) => updateSetting('startOnLogin', e.currentTarget.checked)}
+                  onChange={(e) => {
+                    const value = e.currentTarget.checked;
+                    updateSetting('startOnLogin', value);
+                    window.electron.setOpenAtLogin(value);
+                  }}
                   class="sr-only peer"
                 />
-                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
+                <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
               </label>
             </div>
           </div>
@@ -298,12 +319,12 @@ const Settings: Component = () => {
               <span class="text-3xl text-white">♫</span>
             </div>
             <div>
-              <p class="text-white font-semibold text-lg">Apple Music Client</p>
+              <p class="text-white font-semibold text-lg">Tuffahi</p>
               <p class="text-sm text-white/60">Version 0.1.0</p>
             </div>
           </div>
           <p class="text-sm text-white/40">
-            Unofficial client built with Tauri, SolidJS, and MusicKit JS.
+            Unofficial client built with Electron, SolidJS, and MusicKit JS.
             Not affiliated with Apple Inc.
           </p>
         </div>
@@ -321,7 +342,7 @@ const Settings: Component = () => {
 const ShortcutRow: Component<{ label: string; shortcut: string }> = (props) => (
   <div class="flex items-center justify-between p-4">
     <span class="text-white">{props.label}</span>
-    <kbd class="px-2 py-1 bg-surface-tertiary rounded text-sm text-white/60 font-mono">
+    <kbd class="px-2 py-1 bg-surface-tertiary rounded-sm text-sm text-white/60 font-mono">
       {props.shortcut}
     </kbd>
   </div>

@@ -46,6 +46,12 @@ async function withRetry<T>(
     } catch (error) {
       lastError = error as Error;
 
+      // Don't retry client errors (4xx) — they won't succeed on retry
+      const status = (error as any)?.status ?? (error as any)?.errorCode;
+      if (status && status >= 400 && status < 500) {
+        throw lastError;
+      }
+
       if (attempt < retries) {
         const delay = Math.min(
           RETRY_CONFIG.baseDelay * Math.pow(2, attempt),
@@ -99,13 +105,13 @@ export const searchAPI = {
       cacheKey,
       async () => {
         const response = await withRetry(() =>
-          mk.api.music('/v1/catalog/{{storefrontId}}/search', {
+          mk.api.music<{ results: MusicKit.SearchResults }>('/v1/catalog/{{storefrontId}}/search', {
             term,
             types: types.join(','),
             limit,
           })
         );
-        return response.data.results as MusicKit.SearchResults;
+        return response.data.results;
       },
       CACHE_DURATION.SHORT
     );
@@ -197,6 +203,20 @@ export const catalogAPI = {
       mk.api.music(`/v1/catalog/{{storefrontId}}/songs/${id}`)
     );
     return (response.data as { data: MusicKit.Song[] }).data[0];
+  },
+
+  async getSongs(ids: string[]): Promise<MusicKit.Song[]> {
+    const mk = musicKitStore.instance();
+    if (!mk) throw new APIError('MusicKit not initialized');
+
+    if (ids.length === 0) return [];
+
+    const response = await withRetry(() =>
+      mk.api.music(`/v1/catalog/{{storefrontId}}/songs`, {
+        ids: ids.join(','),
+      })
+    );
+    return (response.data as { data: MusicKit.Song[] }).data;
   },
 
   async getStation(id: string): Promise<MusicKit.Station> {
@@ -568,52 +588,28 @@ export const personalizedAPI = {
     if (!mk) throw new APIError('MusicKit not initialized');
 
     const response = await withRetry(() =>
-      mk.api.music('/v1/me/recent/played', { limit: 25 })
+      mk.api.music('/v1/me/recent/played', { limit: 10 })
     );
     return (response.data as { data: MusicKit.MediaItem[] }).data;
   },
 };
 
-// Lyrics API
-export const lyricsAPI = {
-  async getLyrics(songId: string): Promise<string | null> {
-    const mk = musicKitStore.instance();
-    if (!mk) throw new APIError('MusicKit not initialized');
-
-    const cacheKey = `lyrics:${songId}`;
-
-    try {
-      return await fetchWithCache(
-        cacheKey,
-        async () => {
-          const response = await withRetry(() =>
-            mk.api.music(`/v1/catalog/{{storefrontId}}/songs/${songId}/lyrics`)
-          );
-          const data = response.data as { data?: MusicKit.LyricsData[] };
-          return data.data?.[0]?.attributes?.ttml || null;
-        },
-        CACHE_DURATION.LONG
-      );
-    } catch (error) {
-      logger.warn('api', 'Failed to fetch lyrics', { songId, error });
-      return null;
-    }
-  },
-};
-
 // Radio API
 export const radioAPI = {
-  async getStations(): Promise<MusicKit.Station[]> {
+  async getStations(ids: string[]): Promise<MusicKit.Station[]> {
     const mk = musicKitStore.instance();
     if (!mk) throw new APIError('MusicKit not initialized');
+    if (ids.length === 0) return [];
 
-    const cacheKey = 'radio:stations';
+    const cacheKey = `radio:stations:${ids.join(',')}`;
 
     return fetchWithCache(
       cacheKey,
       async () => {
         const response = await withRetry(() =>
-          mk.api.music('/v1/catalog/{{storefrontId}}/stations', { limit: 50 })
+          mk.api.music('/v1/catalog/{{storefrontId}}/stations', {
+            ids: ids.join(','),
+          })
         );
         return (response.data as { data: MusicKit.Station[] }).data;
       },
@@ -622,24 +618,9 @@ export const radioAPI = {
   },
 
   async getLiveStations(): Promise<MusicKit.Station[]> {
-    const mk = musicKitStore.instance();
-    if (!mk) throw new APIError('MusicKit not initialized');
-
-    const cacheKey = 'radio:live';
-
-    return fetchWithCache(
-      cacheKey,
-      async () => {
-        const response = await withRetry(() =>
-          mk.api.music('/v1/catalog/{{storefrontId}}/stations', {
-            'filter[featured]': 'apple-music-live-stations',
-            limit: 10,
-          })
-        );
-        return (response.data as { data: MusicKit.Station[] }).data;
-      },
-      CACHE_DURATION.MEDIUM
-    );
+    // Known Apple Music live radio station IDs
+    const liveIds = ['ra.978484891', 'ra.1498157166', 'ra.1498157150'];
+    return this.getStations(liveIds);
   },
 };
 
@@ -720,15 +701,65 @@ export const playlistAPI = {
   },
 };
 
+// Ratings API
+// Uses /v1/me/ratings/{type} with ids query param (batch) or /v1/me/ratings/{type}/{id}
+export const ratingsAPI = {
+  async getRating(type: 'songs' | 'albums' | 'playlists', id: string): Promise<number | null> {
+    const mk = musicKitStore.instance();
+    if (!mk) throw new APIError('MusicKit not initialized');
+
+    try {
+      const response = await mk.api.music(`/v1/me/ratings/${type}`, {
+        ids: id,
+      });
+      const data = response.data as { data?: { attributes?: { value: number } }[] };
+      return data.data?.[0]?.attributes?.value ?? null;
+    } catch {
+      return null;
+    }
+  },
+
+  async setRating(type: 'songs' | 'albums' | 'playlists', id: string, value: 1 | -1): Promise<void> {
+    const mk = musicKitStore.instance();
+    if (!mk) throw new APIError('MusicKit not initialized');
+
+    await withRetry(() =>
+      mk.api.music(`/v1/me/ratings/${type}/${id}`, {}, {
+        fetchOptions: {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: [{
+              type: 'rating',
+              attributes: { value },
+            }],
+          }),
+        },
+      })
+    );
+  },
+
+  async deleteRating(type: 'songs' | 'albums' | 'playlists', id: string): Promise<void> {
+    const mk = musicKitStore.instance();
+    if (!mk) throw new APIError('MusicKit not initialized');
+
+    await withRetry(() =>
+      mk.api.music(`/v1/me/ratings/${type}/${id}`, {}, {
+        fetchOptions: { method: 'DELETE' },
+      })
+    );
+  },
+};
+
 // Export all APIs
 export const api = {
   search: searchAPI,
   catalog: catalogAPI,
   library: libraryAPI,
   personalized: personalizedAPI,
-  lyrics: lyricsAPI,
   radio: radioAPI,
   playlist: playlistAPI,
+  ratings: ratingsAPI,
 };
 
 export { APIError };
