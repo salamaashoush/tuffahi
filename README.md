@@ -1,45 +1,39 @@
-# Apple Music Client
+# Tuffahi
 
-An **unofficial** cross-platform Apple Music client built with **Tauri v2**, **SolidJS**, and **MusicKit JS**.
+An **unofficial** cross-platform Apple Music client built with **Electron**, **SolidJS**, and **MusicKit JS**.
 
 > **Disclaimer:** This is an unofficial third-party client. Not affiliated with or endorsed by Apple Inc. Requires an Apple Music subscription.
 
 ## Features
 
-- Browse Apple Music catalog (Top Charts, Featured Playlists)
-- Search for songs, albums, and artists
-- Access your Apple Music library (songs, albums, playlists)
-- Full playback controls with progress bar and volume
-- Synced lyrics display
+- Browse Apple Music catalog (Top Charts, Featured Playlists, Genres)
+- Search for songs, albums, artists, and playlists
+- Access your Apple Music library (songs, albums, playlists, recently added)
+- Full playback controls with progress bar, volume, shuffle, and repeat
+- Mini player mode (compact always-on-top window)
+- Now Playing view with large artwork display
+- Queue management
+- Audio quality selection (Standard 64 kbps / High 256 kbps)
+- Discord Rich Presence integration
+- Customizable themes
 - System tray integration with quick controls
 - Keyboard shortcuts for media control
-- Cross-platform support (Windows, macOS, Linux)
+- Song ratings (love/dislike)
+- Sleep timer
+- Play history tracking
+- Cross-platform support (Linux, macOS, Windows)
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+)
-- [Rust](https://www.rust-lang.org/tools/install) (latest stable)
-- [Tauri CLI](https://tauri.app/v2/start/prerequisites/)
-
-### Platform-specific requirements
-
-#### Linux
-```bash
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libappindicator3-dev
-```
-
-#### macOS
-Xcode Command Line Tools required.
-
-#### Windows
-WebView2 runtime (usually pre-installed on Windows 10/11).
+- An [Apple Developer account](https://developer.apple.com/) with a MusicKit key
 
 ## Setup
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd apple-music-client
+git clone https://github.com/salamaashoush/tuffahi.git
+cd tuffahi
 ```
 
 2. Install dependencies:
@@ -55,9 +49,9 @@ cp .env.example .env
 ```
 
 You need:
-- **Team ID**: Found in Apple Developer Portal under Membership
-- **Key ID**: Generated when creating a MusicKit key
-- **Private Key (.p8)**: Downloaded when creating the MusicKit key
+- **Team ID** — Found in Apple Developer Portal under Membership
+- **Key ID** — Generated when creating a MusicKit key
+- **Private Key (.p8)** — Downloaded when creating the MusicKit key
 
 See [Apple's MusicKit documentation](https://developer.apple.com/documentation/applemusicapi/getting_keys_and_creating_tokens) for details.
 
@@ -65,83 +59,109 @@ See [Apple's MusicKit documentation](https://developer.apple.com/documentation/a
 
 Run the app in development mode:
 ```bash
-npm run tauri dev
+npm run dev
 ```
 
-This starts both the Vite dev server and the Tauri application with hot-reload enabled.
+This starts the Electron app with Vite HMR for the renderer process.
 
 ## Building
 
-Build the application for your current platform:
+Build the application:
 ```bash
-npm run tauri build
+npm run build
 ```
 
-The built application will be in `src-tauri/target/release/bundle/`.
+Package for distribution:
+```bash
+npm run package
+```
+
+Output formats by platform:
+- **Linux** — AppImage, .deb
+- **macOS** — .dmg
+- **Windows** — NSIS installer
 
 ## Project Structure
 
 ```
-apple-music-client/
-├── src/                      # Frontend (SolidJS)
-│   ├── components/           # UI Components
+tuffahi/
+├── electron/
+│   ├── main/               # Main process (Node.js)
+│   │   ├── index.ts        # App lifecycle, windows, tray
+│   │   ├── ipc-handlers.ts # IPC handler registrations
+│   │   ├── auth-window.ts  # Apple auth flow
+│   │   ├── token.ts        # JWT developer token (ES256)
+│   │   └── discord.ts      # Discord RPC
+│   └── preload/
+│       └── index.ts        # contextBridge API
+├── src/                     # Renderer (SolidJS)
+│   ├── components/          # UI components
 │   │   ├── Player/          # Playback controls
+│   │   ├── NowPlaying/      # Full-screen now playing
+│   │   ├── MiniPlayer/      # Compact player window
 │   │   ├── Library/         # User library views
-│   │   ├── Browse/          # Search & discovery
-│   │   ├── Lyrics/          # Synced lyrics
-│   │   └── Sidebar/         # Navigation
-│   ├── stores/              # State management
+│   │   ├── Browse/          # Catalog & search
+│   │   ├── Queue/           # Queue panel
+│   │   ├── Settings/        # App settings
+│   │   ├── Sidebar/         # Navigation
+│   │   └── ...
+│   ├── stores/              # SolidJS reactive stores
 │   ├── hooks/               # Custom hooks
+│   ├── services/            # API, cache, storage, Discord
 │   ├── lib/                 # MusicKit utilities
+│   ├── types/               # TypeScript type definitions
 │   └── styles/              # Global CSS
-├── src-tauri/               # Backend (Rust/Tauri)
-│   ├── src/
-│   │   ├── commands/        # Tauri commands
-│   │   └── musickit/        # JWT token generation
-│   └── capabilities/        # Permissions
-├── package.json
-├── vite.config.ts
-└── tailwind.config.js
+├── resources/               # App icons
+├── electron.vite.config.ts  # Build config (main, preload, renderer)
+├── electron-builder.yml     # Packaging config
+└── package.json
 ```
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Space` | Play/Pause |
-| `Ctrl/Cmd + →` | Next track |
-| `Ctrl/Cmd + ←` | Previous track |
-| `Ctrl/Cmd + ↑` | Volume up |
-| `Ctrl/Cmd + ↓` | Volume down |
-| `Ctrl/Cmd + M` | Mute/Unmute |
+| `Space` | Play / Pause |
+| `Ctrl + →` | Next track |
+| `Ctrl + ←` | Previous track |
+| `Ctrl + ↑` | Volume up |
+| `Ctrl + ↓` | Volume down |
+| `Ctrl + M` | Mute / Unmute |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Tauri Shell                            │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                   WebView (SolidJS)                   │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐   │  │
-│  │  │   Player    │  │   Library   │  │    Search    │   │  │
-│  │  │  Controls   │  │    View     │  │    Browse    │   │  │
-│  │  └─────────────┘  └─────────────┘  └──────────────┘   │  │
-│  │                         │                              │  │
-│  │              ┌──────────┴──────────┐                   │  │
-│  │              │    MusicKit JS      │                   │  │
-│  │              │  (Audio Playback)   │                   │  │
-│  │              └─────────────────────┘                   │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                            │                                 │
-│  ┌─────────────────────────┴─────────────────────────────┐  │
-│  │                    Rust Backend                        │  │
-│  │  • Developer Token Generation (JWT/ES256)              │  │
-│  │  • Secure key storage                                  │  │
-│  │  • System tray & media keys                            │  │
-│  │  • Window management                                   │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                     Electron Shell                        │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │              Renderer (SolidJS + Vite)             │  │
+│  │                                                    │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │  │
+│  │  │  Player  │  │ Library  │  │ Browse/Search │   │  │
+│  │  │ Controls │  │  Views   │  │    Views      │   │  │
+│  │  └──────────┘  └──────────┘  └───────────────┘   │  │
+│  │                       │                           │  │
+│  │            ┌──────────┴──────────┐                │  │
+│  │            │    MusicKit JS      │                │  │
+│  │            │  (Audio Playback)   │                │  │
+│  │            └─────────────────────┘                │  │
+│  └───────────────────────┬────────────────────────────┘  │
+│                          │ IPC (contextBridge)           │
+│  ┌───────────────────────┴────────────────────────────┐  │
+│  │                  Main Process                       │  │
+│  │  • Developer Token (JWT/ES256)                      │  │
+│  │  • Apple auth window                                │  │
+│  │  • System tray & window management                  │  │
+│  │  • Discord Rich Presence                            │  │
+│  │  • Auto-launch & close behavior                     │  │
+│  └────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
 ```
+
+## DRM / Widevine
+
+This project uses the [Castlabs Electron fork](https://github.com/nicedoc/nicedoc.io) which includes Widevine CDM support for DRM-protected content playback.
 
 ## License
 
