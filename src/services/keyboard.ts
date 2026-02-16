@@ -204,21 +204,15 @@ class KeyboardService {
 
 export const keyboardService = new KeyboardService();
 
-// Default shortcuts setup - will be called from App initialization
+// Register global media key shortcuts (system-wide, work when app is in background).
+// In-window keyboard shortcuts (Space, Ctrl+Arrows, Ctrl+M) are handled separately
+// by useMediaKeys hook via document keydown listeners.
 export function setupDefaultShortcuts(playerActions: {
   playPause: () => void;
   next: () => void;
   previous: () => void;
-  volumeUp: () => void;
-  volumeDown: () => void;
-  toggleMute: () => void;
-  toggleShuffle: () => void;
-  toggleRepeat: () => void;
-  seekForward: () => void;
-  seekBackward: () => void;
   toggleMiniPlayer: () => void;
 }): void {
-  // Playback controls
   keyboardService.registerShortcut({
     id: 'play-pause',
     name: 'Play/Pause',
@@ -247,69 +241,14 @@ export function setupDefaultShortcuts(playerActions: {
   });
 
   keyboardService.registerShortcut({
-    id: 'volume-up',
-    name: 'Volume Up',
-    description: 'Increase volume',
-    defaultKey: 'CommandOrControl+Up',
+    id: 'media-stop',
+    name: 'Stop',
+    description: 'Stop playback',
+    defaultKey: 'MediaStop',
     category: 'playback',
-    action: playerActions.volumeUp,
+    action: playerActions.playPause,
   });
 
-  keyboardService.registerShortcut({
-    id: 'volume-down',
-    name: 'Volume Down',
-    description: 'Decrease volume',
-    defaultKey: 'CommandOrControl+Down',
-    category: 'playback',
-    action: playerActions.volumeDown,
-  });
-
-  keyboardService.registerShortcut({
-    id: 'toggle-mute',
-    name: 'Toggle Mute',
-    description: 'Mute/unmute audio',
-    defaultKey: 'CommandOrControl+M',
-    category: 'playback',
-    action: playerActions.toggleMute,
-  });
-
-  keyboardService.registerShortcut({
-    id: 'toggle-shuffle',
-    name: 'Toggle Shuffle',
-    description: 'Toggle shuffle mode',
-    defaultKey: 'CommandOrControl+S',
-    category: 'playback',
-    action: playerActions.toggleShuffle,
-  });
-
-  keyboardService.registerShortcut({
-    id: 'toggle-repeat',
-    name: 'Toggle Repeat',
-    description: 'Cycle repeat mode',
-    defaultKey: 'CommandOrControl+R',
-    category: 'playback',
-    action: playerActions.toggleRepeat,
-  });
-
-  keyboardService.registerShortcut({
-    id: 'seek-forward',
-    name: 'Seek Forward',
-    description: 'Skip forward 10 seconds',
-    defaultKey: 'CommandOrControl+Right',
-    category: 'playback',
-    action: playerActions.seekForward,
-  });
-
-  keyboardService.registerShortcut({
-    id: 'seek-backward',
-    name: 'Seek Backward',
-    description: 'Skip backward 10 seconds',
-    defaultKey: 'CommandOrControl+Left',
-    category: 'playback',
-    action: playerActions.seekBackward,
-  });
-
-  // App controls
   keyboardService.registerShortcut({
     id: 'toggle-miniplayer',
     name: 'Toggle Mini Player',
