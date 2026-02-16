@@ -319,7 +319,7 @@ export const accessibilityCSS = `
 
 /* Focus visible styles */
 :focus-visible {
-  outline: 2px solid var(--color-primary, #fa2d48);
+  outline: 2px solid var(--color-primary, #0D9488);
   outline-offset: 2px;
 }
 

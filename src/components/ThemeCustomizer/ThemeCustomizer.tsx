@@ -17,7 +17,7 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
   const [activeTab, setActiveTab] = createSignal<'gallery' | 'create'>('gallery');
   const [currentTheme, setCurrentTheme] = createSignal(themeService.getCurrentTheme());
   const [customName, setCustomName] = createSignal('My Theme');
-  const [customPrimary, setCustomPrimary] = createSignal('#fa2d48');
+  const [customPrimary, setCustomPrimary] = createSignal('#14B8A6');
   const [isCreating, setIsCreating] = createSignal(false);
 
   createEffect(() => {
@@ -246,7 +246,7 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
                     <label class="block text-sm text-white/60 mb-2">Quick Presets</label>
                     <div class="flex flex-wrap gap-2">
                       {[
-                        '#fa2d48',
+                        '#0D9488',
                         '#0a84ff',
                         '#30d158',
                         '#bf5af2',

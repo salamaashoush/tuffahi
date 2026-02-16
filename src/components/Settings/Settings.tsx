@@ -307,7 +307,9 @@ const Settings: Component = () => {
           <ShortcutRow label="Volume Up" shortcut="Ctrl + ↑" />
           <ShortcutRow label="Volume Down" shortcut="Ctrl + ↓" />
           <ShortcutRow label="Mute" shortcut="Ctrl + M" />
+          <ShortcutRow label="Mini Player" shortcut="Ctrl + Shift + M" />
         </div>
+        <p class="text-xs text-white/30 mt-2 px-1">Media keys (play/pause, next, previous) also work globally when the app is in the background.</p>
       </section>
 
       {/* About */}
@@ -315,11 +317,11 @@ const Settings: Component = () => {
         <h2 class="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">About</h2>
         <div class="bg-surface-secondary rounded-xl overflow-hidden p-4">
           <div class="flex items-center gap-4 mb-4">
-            <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center">
-              <span class="text-3xl text-white">♫</span>
+            <div class="w-16 h-16 rounded-xl overflow-hidden">
+              <svg viewBox="0 0 512 512" class="w-full h-full"><defs><linearGradient id="ab" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#14B8A6"/><stop offset="50%" stop-color="#0D9488"/><stop offset="100%" stop-color="#115E59"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FCD34D"/><stop offset="100%" stop-color="#F59E0B"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#ab)"/><path d="M256 105C320 115 375 175 375 260C375 340 320 405 256 415C192 405 137 340 137 260C137 175 192 115 256 105Z" fill="#fff" fill-opacity=".93"/><g fill="url(#ab)"><rect x="198" y="240" width="16" height="70" rx="8" opacity=".75"/><rect x="228" y="200" width="16" height="120" rx="8" opacity=".8"/><rect x="258" y="170" width="16" height="160" rx="8" opacity=".85"/><rect x="288" y="210" width="16" height="110" rx="8" opacity=".8"/><rect x="318" y="250" width="16" height="60" rx="8" opacity=".75"/></g><path d="M256 105C254 88 258 70 272 55" fill="none" stroke="url(#gd)" stroke-width="6" stroke-linecap="round"/><path d="M268 62C285 48 310 45 325 52C308 62 285 68 268 62Z" fill="url(#gd)"/></svg>
             </div>
             <div>
-              <p class="text-white font-semibold text-lg">Tuffahi</p>
+              <p class="text-white font-semibold text-lg">Tuffahi <span class="text-white/40 text-sm font-normal">تُفَّاحِي</span></p>
               <p class="text-sm text-white/60">Version 0.1.0</p>
             </div>
           </div>

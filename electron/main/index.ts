@@ -57,15 +57,15 @@ const SPLASH_HTML = `<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
 .c{display:flex;flex-direction:column;align-items:center;gap:20px;animation:fi .3s ease-out}
-.i{width:72px;height:72px;border-radius:16px;background:linear-gradient(135deg,#fa2d48,#e91e63);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(250,45,72,.3)}
-.i svg{width:36px;height:36px;fill:#fff}
+.i{width:72px;height:72px}
+.i svg{width:72px;height:72px}
 .t{text-align:center}.h{color:#fff;font-size:20px;font-weight:700;margin-bottom:4px}.s{color:rgba(255,255,255,.35);font-size:12px}
 .b{width:140px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:4px}
-.bi{height:100%;background:#fa2d48;border-radius:2px;animation:l 1.4s ease-in-out infinite}
+.bi{height:100%;background:#0D9488;border-radius:2px;animation:l 1.4s ease-in-out infinite}
 @keyframes l{0%{width:0%;margin-left:0}50%{width:50%;margin-left:25%}100%{width:0%;margin-left:100%}}
 @keyframes fi{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 </style></head><body>
-<div class="c"><div class="i"><svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55C7.79 13 6 14.79 6 17s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>
+<div class="c"><div class="i"><svg viewBox="0 0 512 512"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#14B8A6"/><stop offset="50%" stop-color="#0D9488"/><stop offset="100%" stop-color="#115E59"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FCD34D"/><stop offset="100%" stop-color="#F59E0B"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg)"/><path d="M256 105C320 115 375 175 375 260C375 340 320 405 256 415C192 405 137 340 137 260C137 175 192 115 256 105Z" fill="#fff" fill-opacity=".93"/><g fill="url(#bg)"><rect x="198" y="240" width="16" height="70" rx="8" opacity=".75"/><rect x="228" y="200" width="16" height="120" rx="8" opacity=".8"/><rect x="258" y="170" width="16" height="160" rx="8" opacity=".85"/><rect x="288" y="210" width="16" height="110" rx="8" opacity=".8"/><rect x="318" y="250" width="16" height="60" rx="8" opacity=".75"/></g><path d="M256 105C254 88 258 70 272 55" fill="none" stroke="url(#gd)" stroke-width="6" stroke-linecap="round"/><path d="M268 62C285 48 310 45 325 52C308 62 285 68 268 62Z" fill="url(#gd)"/></svg></div>
 <div class="t"><div class="h">Tuffahi</div><div class="s">Loading...</div></div>
 <div class="b"><div class="bi"></div></div></div>
 </body></html>`;

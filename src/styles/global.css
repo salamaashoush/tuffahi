@@ -30,17 +30,17 @@
 @layer base {
   /* CSS Variables for theming - set by themeService */
   :root {
-    --theme-primary: #fa2d48;
-    --theme-primary-hover: #ff4d6d;
-    --theme-background: #000000;
-    --theme-surface: #1a1a1a;
-    --theme-surface-secondary: #2a2a2a;
-    --theme-surface-tertiary: #3a3a3a;
-    --theme-text-primary: #ffffff;
-    --theme-text-secondary: rgba(255, 255, 255, 0.6);
-    --theme-text-muted: rgba(255, 255, 255, 0.4);
-    --theme-accent: #fa2d48;
-    --theme-accent-hover: #ff4d6d;
+    --theme-primary: #14B8A6;
+    --theme-primary-hover: #2DD4BF;
+    --theme-background: #0C0F0E;
+    --theme-surface: #151A19;
+    --theme-surface-secondary: #1E2524;
+    --theme-surface-tertiary: #2A3130;
+    --theme-text-primary: #F0FDFA;
+    --theme-text-secondary: rgba(240, 253, 250, 0.65);
+    --theme-text-muted: rgba(240, 253, 250, 0.38);
+    --theme-accent: #F59E0B;
+    --theme-accent-hover: #FBBF24;
     --theme-success: #30d158;
     --theme-warning: #ffd60a;
     --theme-error: #ff453a;
@@ -156,7 +156,7 @@
 
   /* Gradient text for Apple Music style */
   .gradient-text {
-    background: linear-gradient(90deg, #fa243c, #fb5c74);
+    background: linear-gradient(90deg, #0D9488, #14B8A6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -245,10 +245,10 @@
 
 @keyframes lyric-glow {
   0%, 100% {
-    text-shadow: 0 0 10px rgba(250, 45, 72, 0.5);
+    text-shadow: 0 0 10px rgba(13, 148, 136, 0.5);
   }
   50% {
-    text-shadow: 0 0 20px rgba(250, 45, 72, 0.8);
+    text-shadow: 0 0 20px rgba(13, 148, 136, 0.8);
   }
 }
 
