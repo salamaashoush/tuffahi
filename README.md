@@ -1,6 +1,12 @@
-# Tuffahi
+<p align="center">
+  <img src="resources/icon.svg" width="128" height="128" alt="Tuffahi">
+</p>
 
-An **unofficial** cross-platform Apple Music client built with **Electron**, **SolidJS**, and **MusicKit JS**.
+<h1 align="center">Tuffahi <sub>تُفَّاحِي</sub></h1>
+
+<p align="center">
+  An <strong>unofficial</strong> cross-platform Apple Music client built with <strong>Electron</strong>, <strong>SolidJS</strong>, and <strong>MusicKit JS</strong>.
+</p>
 
 > **Disclaimer:** This is an unofficial third-party client. Not affiliated with or endorsed by Apple Inc. Requires an Apple Music subscription.
 
