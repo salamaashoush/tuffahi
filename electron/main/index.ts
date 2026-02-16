@@ -9,12 +9,8 @@ import {
 } from 'electron';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { config } from 'dotenv';
-import { registerIpcHandlers, getMiniPlayerOnClose } from './ipc-handlers';
+import { registerIpcHandlers, getMiniPlayerOnClose, getIsMiniPlayerMode } from './ipc-handlers';
 import { openAuthWindow } from './auth-window';
-
-// Load .env before anything else
-config();
 
 // ─── Wayland support ──────────────────────────────────────────────────────────
 // Enable native Wayland when available, fall back to X11 otherwise.
@@ -28,6 +24,7 @@ app.commandLine.appendSwitch('enable-accelerated-video');
 app.commandLine.appendSwitch('enable-accelerated-video-decode');
 app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
 app.commandLine.appendSwitch('enable-oop-rasterization');
+app.commandLine.appendSwitch('no-zygote');  // no need for pre-forked process pool
 
 // ─── Single Instance Lock ─────────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
@@ -119,6 +116,7 @@ function createMainWindow(): void {
       sandbox: false,                // preload needs Node APIs (contextBridge)
       webSecurity: true,
       spellcheck: false,
+      v8CacheOptions: 'code',
       backgroundThrottling: false,   // keep audio smooth when window is hidden
     },
   });
@@ -155,11 +153,6 @@ function createMainWindow(): void {
     }
   });
 
-  // Auto-open DevTools in dev mode
-  if (is.dev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
-
   // Splash → main window transition
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
@@ -170,17 +163,21 @@ function createMainWindow(): void {
     }
   });
 
-  // Hide instead of close so MusicKit keeps playing (especially for mini player)
+  // Hide instead of close so MusicKit keeps playing
   mainWindow.on('close', (e) => {
     if (!(app as any).isQuitting) {
       e.preventDefault();
-      if (getMiniPlayerOnClose()) {
-        // Open mini player and hide main window
+      if (getIsMiniPlayerMode()) {
+        // In mini player mode, closing just hides the window
+        mainWindow?.hide();
+      } else if (getMiniPlayerOnClose()) {
+        // Switch to mini player mode instead of hiding
         mainWindow?.webContents.executeJavaScript(
           'window.electron.openMiniPlayer()'
         ).catch(() => {});
+      } else {
+        mainWindow?.hide();
       }
-      mainWindow?.hide();
     }
   });
 

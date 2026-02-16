@@ -1,4 +1,5 @@
 appId: com.tuffahi.app
+electronDist: node_modules/electron/dist
 productName: Tuffahi
 directories:
   buildResources: resources

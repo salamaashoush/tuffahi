@@ -1,12 +1,3 @@
-interface MiniPlayerState {
-  isPlaying: boolean;
-  currentTime: number;
-  duration: number;
-  trackName: string;
-  artistName: string;
-  artworkUrl: string;
-}
-
 interface ElectronAPI {
   // Token
   getDeveloperToken(): Promise<string>;
@@ -47,11 +38,9 @@ interface ElectronAPI {
   unregisterShortcut(accelerator: string): Promise<void>;
   unregisterAllShortcuts(): Promise<void>;
 
-  // Mini Player IPC
-  sendPlayerState(state: MiniPlayerState): void;
-  miniPlayerCommand(command: string): Promise<void>;
-  onPlayerStateUpdate(callback: (state: MiniPlayerState) => void): () => void;
-  onMiniPlayerCommand(callback: (command: string) => void): () => void;
+  // Mini Player mode events
+  onEnterMiniPlayer(callback: () => void): () => void;
+  onExitMiniPlayer(callback: () => void): () => void;
 
   // Events (return unlisten function)
   onAppleMusicToken(callback: (token: string) => void): () => void;

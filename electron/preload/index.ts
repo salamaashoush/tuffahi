@@ -40,18 +40,16 @@ contextBridge.exposeInMainWorld('electron', {
   unregisterShortcut: (accelerator: string) => ipcRenderer.invoke('unregister-shortcut', accelerator),
   unregisterAllShortcuts: () => ipcRenderer.invoke('unregister-all-shortcuts'),
 
-  // Mini Player IPC
-  sendPlayerState: (state: unknown) => ipcRenderer.send('player-state-update', state),
-  miniPlayerCommand: (command: string) => ipcRenderer.invoke('mini-player-command', command),
-  onPlayerStateUpdate: (callback: (state: unknown) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, state: unknown) => callback(state);
-    ipcRenderer.on('player-state-update', handler);
-    return () => ipcRenderer.removeListener('player-state-update', handler);
+  // Mini Player mode events
+  onEnterMiniPlayer: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('enter-mini-player', handler);
+    return () => ipcRenderer.removeListener('enter-mini-player', handler);
   },
-  onMiniPlayerCommand: (callback: (command: string) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, command: string) => callback(command);
-    ipcRenderer.on('mini-player-command', handler);
-    return () => ipcRenderer.removeListener('mini-player-command', handler);
+  onExitMiniPlayer: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('exit-mini-player', handler);
+    return () => ipcRenderer.removeListener('exit-mini-player', handler);
   },
 
   // Events (main → renderer)
