@@ -1,18 +1,19 @@
-import { ipcMain, globalShortcut, BrowserWindow, shell, app } from 'electron';
-import { join } from 'path';
+import { ipcMain, globalShortcut, BrowserWindow, app } from 'electron';
 import { getDeveloperToken, refreshDeveloperToken, isMusicKitConfigured } from './token';
 import { openAuthWindow } from './auth-window';
 import { discordConnect, discordDisconnect, discordSetActivity, discordClearActivity } from './discord';
 
-export function getMiniPlayerWindow(): BrowserWindow | null {
-  return miniPlayerWindow;
-}
-
 // Close behavior flag: when true, closing main window opens mini player
 let miniPlayerOnClose = false;
+let isMiniPlayerMode = false;
+let savedBounds: Electron.Rectangle | null = null;
 
 export function getMiniPlayerOnClose(): boolean {
   return miniPlayerOnClose;
+}
+
+export function getIsMiniPlayerMode(): boolean {
+  return isMiniPlayerMode;
 }
 
 export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): void {
@@ -32,13 +33,50 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
   ipcMain.handle('open-mini-player', () => {
     const mainWindow = getMainWindow();
     if (!mainWindow) return;
-    createMiniPlayer(mainWindow);
+    if (isMiniPlayerMode) return;
+
+    // Save current bounds
+    savedBounds = mainWindow.getBounds();
+    isMiniPlayerMode = true;
+
+    // Resize to mini player dimensions
+    mainWindow.setMinimumSize(280, 340);
+    mainWindow.setSize(280, 340);
+    mainWindow.setResizable(false);
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.setSkipTaskbar(true);
+
+    // Tell renderer to switch to mini player route
+    mainWindow.webContents.send('enter-mini-player');
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   ipcMain.handle('close-mini-player', () => {
-    if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-      miniPlayerWindow.close();
+    const mainWindow = getMainWindow();
+    if (!mainWindow || !isMiniPlayerMode) return;
+
+    isMiniPlayerMode = false;
+
+    // Restore window properties
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.setSkipTaskbar(false);
+    mainWindow.setResizable(true);
+    mainWindow.setMinimumSize(800, 600);
+
+    // Restore saved bounds
+    if (savedBounds) {
+      mainWindow.setBounds(savedBounds);
+      savedBounds = null;
+    } else {
+      mainWindow.setSize(1280, 800);
+      mainWindow.center();
     }
+
+    // Tell renderer to switch back to main view
+    mainWindow.webContents.send('exit-mini-player');
+    mainWindow.show();
+    mainWindow.focus();
   });
 
   ipcMain.handle('hide-main-window', () => {
@@ -50,28 +88,6 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
-    }
-  });
-
-  // ── Mini Player Controls (mini player → main window) ─────────────────────
-  // Uses executeJavaScript to call the player command directly in the main
-  // window — no event listeners to stack or duplicate on HMR.
-  ipcMain.handle('mini-player-command', async (_event, command: string) => {
-    const mainWindow = getMainWindow();
-    if (!mainWindow) return;
-    try {
-      await mainWindow.webContents.executeJavaScript(
-        `window.__playerCommand && window.__playerCommand(${JSON.stringify(command)})`
-      );
-    } catch (err) {
-      console.error('[IPC] mini-player-command executeJavaScript failed:', err);
-    }
-  });
-
-  // Main window sends player state updates → forwarded to mini player
-  ipcMain.on('player-state-update', (_event, state) => {
-    if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-      miniPlayerWindow.webContents.send('player-state-update', state);
     }
   });
 
@@ -118,53 +134,5 @@ export function registerIpcHandlers(getMainWindow: () => BrowserWindow | null): 
 
   ipcMain.handle('unregister-all-shortcuts', () => {
     globalShortcut.unregisterAll();
-  });
-}
-
-// ── Mini Player ───────────────────────────────────────────────────────────────
-let miniPlayerWindow: BrowserWindow | null = null;
-
-function createMiniPlayer(mainWindow: BrowserWindow): void {
-  if (miniPlayerWindow && !miniPlayerWindow.isDestroyed()) {
-    miniPlayerWindow.show();
-    miniPlayerWindow.focus();
-    return;
-  }
-
-  const preloadPath = join(__dirname, '../preload/index.mjs');
-
-  miniPlayerWindow = new BrowserWindow({
-    width: 280,
-    height: 340,
-    resizable: false,
-    alwaysOnTop: true,
-    frame: false,
-    transparent: true,
-    skipTaskbar: true,
-    title: 'Mini Player',
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-      backgroundThrottling: false,
-    },
-  });
-
-  // Open external links in system browser
-  miniPlayerWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev && process.env.ELECTRON_RENDERER_URL) {
-    miniPlayerWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/miniplayer.html`);
-  } else {
-    miniPlayerWindow.loadFile(join(__dirname, '../renderer/miniplayer.html'));
-  }
-
-  miniPlayerWindow.on('closed', () => {
-    miniPlayerWindow = null;
   });
 }

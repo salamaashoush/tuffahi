@@ -173,23 +173,6 @@ function createPlayerStore(): PlayerStore {
     });
   });
 
-  // Send player state to mini player whenever it changes
-  createEffect(() => {
-    const s = state();
-    const ct = currentTime();
-    const dur = duration();
-    if (!window.electron?.sendPlayerState) return;
-    const np = s.nowPlaying;
-    window.electron.sendPlayerState({
-      isPlaying: s.isPlaying,
-      currentTime: ct,
-      duration: dur,
-      trackName: np?.attributes?.name ?? '',
-      artistName: np?.attributes?.artistName ?? '',
-      artworkUrl: np?.attributes?.artwork ? formatArtworkUrl(np.attributes.artwork, 300) : '',
-    });
-  });
-
   // Expose player commands on window so the main process can call them
   // via executeJavaScript (from mini player, tray, etc.) — no IPC listeners
   // means no stacking, no HMR duplication, no races.

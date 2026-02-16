@@ -59,17 +59,6 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
         }}
       />
 
-      {/* Blurred artwork background */}
-      <Show when={state().nowPlaying?.attributes.artwork}>
-        <div class="absolute inset-0 overflow-hidden">
-          <img
-            src={formatArtworkUrl(state().nowPlaying!.attributes.artwork, 100)}
-            alt=""
-            class="w-full h-full object-cover blur-3xl opacity-30 scale-110"
-          />
-        </div>
-      </Show>
-
       {/* Content */}
       <div class="relative h-full flex flex-col">
         {/* Header */}

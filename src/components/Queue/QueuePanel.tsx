@@ -8,9 +8,14 @@ interface QueuePanelProps {
   onClose: () => void;
 }
 
+const MAX_UP_NEXT = 50;
+const MAX_HISTORY = 20;
+
 const QueuePanel: Component<QueuePanelProps> = (props) => {
   const [draggedIndex, setDraggedIndex] = createSignal<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
+  const [showAllUpNext, setShowAllUpNext] = createSignal(false);
+  const [showAllHistory, setShowAllHistory] = createSignal(false);
 
   const queue = () => playerStore.state().queue;
   const nowPlaying = () => playerStore.state().nowPlaying;
@@ -22,17 +27,29 @@ const QueuePanel: Component<QueuePanelProps> = (props) => {
     return q.findIndex((item) => item?.id === np.id);
   });
 
-  const history = createMemo(() => {
+  const fullHistory = createMemo(() => {
     const idx = currentIndex();
     if (idx <= 0) return [];
     return queue().slice(0, idx);
   });
 
-  const upNext = createMemo(() => {
+  const history = createMemo(() => {
+    const h = fullHistory();
+    if (showAllHistory() || h.length <= MAX_HISTORY) return h;
+    return h.slice(h.length - MAX_HISTORY);
+  });
+
+  const fullUpNext = createMemo(() => {
     const idx = currentIndex();
     const q = queue();
     if (idx === -1) return q;
     return q.slice(idx + 1);
+  });
+
+  const upNext = createMemo(() => {
+    const u = fullUpNext();
+    if (showAllUpNext() || u.length <= MAX_UP_NEXT) return u;
+    return u.slice(0, MAX_UP_NEXT);
   });
 
   const handlePlayFromQueue = async (queueIndex: number) => {
@@ -183,11 +200,21 @@ const QueuePanel: Component<QueuePanelProps> = (props) => {
           </Show>
 
           {/* Playing Next */}
-          <Show when={upNext().length > 0}>
+          <Show when={fullUpNext().length > 0}>
             <div class="p-4">
-              <p class="text-xs text-white/40 uppercase tracking-wider mb-3">
-                Playing Next ({upNext().length})
-              </p>
+              <div class="flex items-center justify-between mb-3">
+                <p class="text-xs text-white/40 uppercase tracking-wider">
+                  Playing Next ({fullUpNext().length})
+                </p>
+                <Show when={fullUpNext().length > MAX_UP_NEXT && !showAllUpNext()}>
+                  <button
+                    onClick={() => setShowAllUpNext(true)}
+                    class="text-xs text-brand hover:text-brand/80 transition-smooth"
+                  >
+                    Show all
+                  </button>
+                </Show>
+              </div>
               <div class="space-y-1">
                 <For each={upNext()}>
                   {(track, index) => {
@@ -273,16 +300,28 @@ const QueuePanel: Component<QueuePanelProps> = (props) => {
           </Show>
 
           {/* History */}
-          <Show when={history().length > 0}>
+          <Show when={fullHistory().length > 0}>
             <div class="p-4 border-t border-white/10">
-              <p class="text-xs text-white/40 uppercase tracking-wider mb-3">
-                History ({history().length})
-              </p>
+              <div class="flex items-center justify-between mb-3">
+                <p class="text-xs text-white/40 uppercase tracking-wider">
+                  History ({fullHistory().length})
+                </p>
+                <Show when={fullHistory().length > MAX_HISTORY && !showAllHistory()}>
+                  <button
+                    onClick={() => setShowAllHistory(true)}
+                    class="text-xs text-brand hover:text-brand/80 transition-smooth"
+                  >
+                    Show all
+                  </button>
+                </Show>
+              </div>
               <div class="space-y-1">
                 <For each={history()}>
-                  {(track, index) => (
+                  {(track, index) => {
+                    const historyOffset = () => fullHistory().length - history().length;
+                    return (
                     <button
-                      onClick={() => handlePlayFromQueue(index())}
+                      onClick={() => handlePlayFromQueue(historyOffset() + index())}
                       class="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-smooth group text-left opacity-60 hover:opacity-100"
                     >
                       <div class="w-10 h-10 flex-shrink-0">
@@ -310,14 +349,15 @@ const QueuePanel: Component<QueuePanelProps> = (props) => {
                         </p>
                       </div>
                     </button>
-                  )}
+                    );
+                  }}
                 </For>
               </div>
             </div>
           </Show>
 
           {/* Empty State */}
-          <Show when={!nowPlaying() && upNext().length === 0}>
+          <Show when={!nowPlaying() && fullUpNext().length === 0}>
             <div class="flex flex-col items-center justify-center h-64 text-center px-4">
               <div class="w-16 h-16 mb-4 rounded-full bg-surface-secondary flex items-center justify-center">
                 <svg class="w-8 h-8 text-white/20" fill="currentColor" viewBox="0 0 24 24">

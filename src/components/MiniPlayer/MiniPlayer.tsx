@@ -1,130 +1,74 @@
-import { Component, Show, createSignal, onMount, onCleanup } from 'solid-js';
-
-interface MiniPlayerState {
-  isPlaying: boolean;
-  currentTime: number;
-  duration: number;
-  trackName: string;
-  artistName: string;
-  artworkUrl: string;
-}
+import { Component, Show } from 'solid-js';
+import { playerStore } from '../../stores/player';
+import { formatArtworkUrl } from '../../lib/musickit';
 
 const MiniPlayer: Component = () => {
-  const [state, setState] = createSignal<MiniPlayerState>({
-    isPlaying: false,
-    currentTime: 0,
-    duration: 0,
-    trackName: '',
-    artistName: '',
-    artworkUrl: '',
-  });
-
-  onMount(() => {
-    const unlisten = window.electron.onPlayerStateUpdate((newState: unknown) => {
-      setState(newState as MiniPlayerState);
-    });
-
-    onCleanup(unlisten);
-  });
-
-  let commandLock = false;
-  const sendCommand = async (cmd: string) => {
-    if (commandLock) return;
-    commandLock = true;
-    try {
-      await window.electron.miniPlayerCommand(cmd);
-    } catch (err) {
-      console.error('[MiniPlayer] Command failed:', cmd, err);
-    } finally {
-      // Prevent rapid-fire commands — wait for MusicKit to settle
-      setTimeout(() => { commandLock = false; }, 300);
-    }
-  };
+  const { state, currentTime, duration, togglePlayPause, skipNext, skipPrevious } = playerStore;
 
   const handleClose = async () => {
-    try {
-      await window.electron.showMainWindow();
-    } catch {}
     await window.electron.closeMiniPlayer();
   };
 
-  const handleExpand = async () => {
-    try {
-      await window.electron.showMainWindow();
-      await window.electron.closeMiniPlayer();
-    } catch {}
+  const progress = () => {
+    const dur = duration();
+    if (dur <= 0) return 0;
+    return (currentTime() / dur) * 100;
   };
 
-  const progress = () => {
-    const s = state();
-    if (s.duration <= 0) return 0;
-    return (s.currentTime / s.duration) * 100;
-  };
+  const nowPlaying = () => state().nowPlaying;
 
   return (
     <div
-      class="h-screen w-screen bg-surface/95 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 flex flex-col select-none"
+      class="h-screen w-screen bg-surface/95 backdrop-blur-xl overflow-hidden flex flex-col select-none"
       style={{ "-webkit-app-region": "drag" }}
     >
       {/* Album Art */}
       <div class="relative flex-1 min-h-0">
         <Show
-          when={state().artworkUrl}
+          when={nowPlaying()?.attributes.artwork}
           fallback={
-            <div class="w-full h-full bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center">
+            <div class="w-full h-full bg-gradient-to-br from-teal-600 to-teal-900 flex items-center justify-center">
               <span class="text-6xl text-white/80">&#9835;</span>
             </div>
           }
         >
           <img
-            src={state().artworkUrl}
-            alt={state().trackName}
+            src={formatArtworkUrl(nowPlaying()!.attributes.artwork, 300)}
+            alt={nowPlaying()?.attributes.name}
             class="w-full h-full object-cover"
           />
         </Show>
 
-        {/* Expand button */}
+        {/* Close/expand button */}
         <button
-          onClick={handleExpand}
-          class="absolute top-2 left-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors cursor-pointer"
+          onClick={handleClose}
+          class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors cursor-pointer"
           style={{ "-webkit-app-region": "no-drag" }}
-          title="Expand to full window"
+          title="Exit mini player"
         >
           <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
             <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
           </svg>
         </button>
 
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center transition-colors cursor-pointer"
-          style={{ "-webkit-app-region": "no-drag" }}
-          title="Close mini player"
-        >
-          <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-          </svg>
-        </button>
-
-        {/* Gradient overlay for text — pointer-events-none so buttons remain clickable */}
+        {/* Gradient overlay */}
         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
       </div>
 
       {/* Track Info & Controls */}
       <div class="p-3 bg-surface" style={{ "-webkit-app-region": "no-drag" }}>
         <Show
-          when={state().trackName}
+          when={nowPlaying()}
           fallback={
             <p class="text-sm text-white/60 text-center">Not Playing</p>
           }
         >
           <div class="text-center mb-3">
             <p class="text-sm font-medium text-white truncate">
-              {state().trackName}
+              {nowPlaying()!.attributes.name}
             </p>
             <p class="text-xs text-white/60 truncate">
-              {state().artistName}
+              {nowPlaying()!.attributes.artistName}
             </p>
           </div>
         </Show>
@@ -132,7 +76,7 @@ const MiniPlayer: Component = () => {
         {/* Controls */}
         <div class="flex items-center justify-center gap-4">
           <button
-            onClick={() => sendCommand('skipPrevious')}
+            onClick={() => skipPrevious()}
             class="text-white/60 hover:text-white transition-smooth cursor-pointer"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -141,7 +85,7 @@ const MiniPlayer: Component = () => {
           </button>
 
           <button
-            onClick={() => sendCommand('togglePlayPause')}
+            onClick={() => togglePlayPause()}
             class="w-10 h-10 bg-white rounded-full flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
           >
             <Show
@@ -159,7 +103,7 @@ const MiniPlayer: Component = () => {
           </button>
 
           <button
-            onClick={() => sendCommand('skipNext')}
+            onClick={() => skipNext()}
             class="text-white/60 hover:text-white transition-smooth cursor-pointer"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -171,7 +115,7 @@ const MiniPlayer: Component = () => {
         {/* Progress bar */}
         <div class="mt-3 h-1 bg-white/20 rounded-full overflow-hidden">
           <div
-            class="h-full bg-apple-red transition-all"
+            class="h-full bg-brand transition-all"
             style={{ width: `${progress()}%` }}
           />
         </div>

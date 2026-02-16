@@ -2,6 +2,10 @@
   "name": "tuffahi",
   "version": "0.1.0",
   "description": "Tuffahi - Cross-platform music client for Apple Music built with Electron, SolidJS, and MusicKit.",
+  "author": {
+    "name": "Salama Ashoush",
+    "email": "salamaashoush@gmail.com"
+  },
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
@@ -14,8 +18,6 @@
     "@solidjs/router": "^0.15.3",
     "@tailwindcss/vite": "^4.1.18",
     "discord-rpc": "^4.0.1",
-    "dotenv": "^16.4.7",
-    "jsonwebtoken": "^9.0.2",
     "lucide-solid": "^0.563.0",
     "solid-js": "^1.9.4",
     "tailwindcss": "^4.1.18"
@@ -23,6 +25,8 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.7",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
     "electron": "github:castlabs/electron-releases#v40.1.0+wvcus",
     "electron-builder": "^25.1.8",
     "electron-vite": "^5.0.0",

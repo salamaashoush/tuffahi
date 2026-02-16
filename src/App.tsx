@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, createSignal, onMount } from 'solid-js';
+import { Component, lazy, Suspense, createSignal, onMount, Show, onCleanup } from 'solid-js';
 import { Route, Router } from '@solidjs/router';
 import { useMusicKit } from './hooks/useMusicKit';
 import { useTrayEvents } from './hooks/useTrayEvents';
@@ -9,8 +9,6 @@ import { keyboardService, setupDefaultShortcuts } from './services/keyboard';
 import { playerStore } from './stores/player';
 import Sidebar from './components/Sidebar/Sidebar';
 import Player from './components/Player/Player';
-import QueuePanel from './components/Queue/QueuePanel';
-import NowPlayingView from './components/NowPlaying/NowPlayingView';
 import { ContextMenuProvider } from './components/ContextMenu/ContextMenu';
 import { AddToPlaylistModalProvider } from './components/Modal/AddToPlaylistModal';
 import { ToastContainer } from './components/Toast/Toast';
@@ -29,6 +27,11 @@ const Playlists = lazy(() => import('./components/Library/Playlists'));
 const RecentlyPlayedHistory = lazy(() => import('./components/Library/RecentlyPlayedHistory'));
 const PlayHistory = lazy(() => import('./components/Library/PlayHistory'));
 const Settings = lazy(() => import('./components/Settings/Settings'));
+
+// Lazy load heavy overlay components
+const QueuePanel = lazy(() => import('./components/Queue/QueuePanel'));
+const NowPlayingView = lazy(() => import('./components/NowPlaying/NowPlayingView'));
+const MiniPlayer = lazy(() => import('./components/MiniPlayer/MiniPlayer'));
 
 const LoadingSpinner: Component = () => (
   <div class="flex items-center justify-center h-full">
@@ -52,6 +55,7 @@ const LibraryArtistsPage: Component = () => <Library view="artists" />;
 const AppLayout: Component<{ children?: any }> = (props) => {
   const [isQueueOpen, setIsQueueOpen] = createSignal(false);
   const [isNowPlayingOpen, setIsNowPlayingOpen] = createSignal(false);
+  const [isMiniPlayerMode, setIsMiniPlayerMode] = createSignal(false);
 
   // Initialize MusicKit on app load
   useMusicKit();
@@ -67,6 +71,19 @@ const AppLayout: Component<{ children?: any }> = (props) => {
       toggleMiniPlayer: () => window.electron.openMiniPlayer(),
     });
     keyboardService.init();
+
+    // Listen for mini player mode transitions from main process
+    const unEnter = window.electron.onEnterMiniPlayer(() => {
+      setIsMiniPlayerMode(true);
+    });
+    const unExit = window.electron.onExitMiniPlayer(() => {
+      setIsMiniPlayerMode(false);
+    });
+
+    onCleanup(() => {
+      unEnter();
+      unExit();
+    });
   });
 
   // Set up system tray event handlers
@@ -81,40 +98,53 @@ const AppLayout: Component<{ children?: any }> = (props) => {
   return (
     <ContextMenuProvider>
       <AddToPlaylistModalProvider>
-        <div class="h-screen flex flex-col bg-black no-select">
-          <div class="flex-1 flex overflow-hidden">
-            {/* Sidebar */}
-            <Sidebar />
+        <Show
+          when={!isMiniPlayerMode()}
+          fallback={
+            <Suspense fallback={<LoadingSpinner />}>
+              <MiniPlayer />
+            </Suspense>
+          }
+        >
+          <div class="h-screen flex flex-col bg-black no-select">
+            <div class="flex-1 flex overflow-hidden">
+              {/* Sidebar */}
+              <Sidebar />
 
-            {/* Main Content */}
-            <main class="flex-1 overflow-y-auto p-6">
-              <Suspense fallback={<LoadingSpinner />}>
-                {props.children}
+              {/* Main Content */}
+              <main class="flex-1 overflow-y-auto p-6">
+                <Suspense fallback={<LoadingSpinner />}>
+                  {props.children}
+                </Suspense>
+              </main>
+
+              {/* Queue Panel */}
+              <Suspense>
+                <QueuePanel
+                  isOpen={isQueueOpen()}
+                  onClose={() => setIsQueueOpen(false)}
+                />
               </Suspense>
-            </main>
+            </div>
 
-            {/* Queue Panel */}
-            <QueuePanel
-              isOpen={isQueueOpen()}
-              onClose={() => setIsQueueOpen(false)}
+            {/* Player Bar */}
+            <Player
+              onQueueClick={() => setIsQueueOpen(!isQueueOpen())}
+              onNowPlayingClick={() => setIsNowPlayingOpen(true)}
             />
+
+            {/* Now Playing Full View */}
+            <Suspense>
+              <NowPlayingView
+                isOpen={isNowPlayingOpen()}
+                onClose={() => setIsNowPlayingOpen(false)}
+              />
+            </Suspense>
+
+            {/* Toast Notifications */}
+            <ToastContainer />
           </div>
-
-          {/* Player Bar */}
-          <Player
-            onQueueClick={() => setIsQueueOpen(!isQueueOpen())}
-            onNowPlayingClick={() => setIsNowPlayingOpen(true)}
-          />
-
-          {/* Now Playing Full View */}
-          <NowPlayingView
-            isOpen={isNowPlayingOpen()}
-            onClose={() => setIsNowPlayingOpen(false)}
-          />
-
-          {/* Toast Notifications */}
-          <ToastContainer />
-        </div>
+        </Show>
       </AddToPlaylistModalProvider>
     </ContextMenuProvider>
   );

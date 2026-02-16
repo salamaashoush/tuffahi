@@ -43,44 +43,71 @@ function createMusicKitStore(): MusicKitStore {
   // Bridge auth tokens from the Electron auth window back to MusicKit JS.
   // The main process sends the raw token string AND also evals JS directly.
   // This listener is a backup — the eval handles localStorage + MessageEvent.
-  const unlisten = window.electron.onAppleMusicToken((rawToken: string) => {
+  const unlisten = window.electron.onAppleMusicToken(async (rawToken: string) => {
     try {
       console.log('[Tuffahi] IPC received token, payload length:', rawToken?.length);
       if (!rawToken || rawToken.length < 20) return;
 
-      // Store in localStorage
+      // Store under all possible localStorage key patterns
       localStorage.setItem('music.ampwebplay.media-user-token', rawToken);
       localStorage.setItem('music.Tuffahi.media-user-token', rawToken);
       localStorage.setItem('music.tuffahi.media-user-token', rawToken);
+
+      // Also store under the correct MusicKit team-based key
+      try {
+        const devToken = await window.electron.getDeveloperToken();
+        const jwtParts = devToken.split('.');
+        if (jwtParts.length === 3) {
+          const payload = JSON.parse(atob(jwtParts[1]));
+          if (payload.iss) {
+            localStorage.setItem(`music.${payload.iss}.media-user-token`, rawToken);
+          }
+        }
+      } catch {}
       console.log('[Tuffahi] Token stored in localStorage via IPC');
 
       const mk = instance();
       if (mk) {
-        // Dispatch MessageEvent FIRST (popup still "open")
+        // Set token directly on MusicKit instance
+        (mk as unknown as Record<string, unknown>).musicUserToken = rawToken;
+
+        // Close mock popup so MusicKit's authorize() promise resolves
+        if (authMockWindow) authMockWindow.closed = true;
+
+        // Dispatch MessageEvent as MusicKit's auth flow expects
         window.dispatchEvent(
           new MessageEvent('message', {
             data: { thirdPartyInfo: { 'music-user-token': rawToken } },
             origin: 'https://authorize.music.apple.com',
           }),
         );
-        // Set token directly on instance
-        (mk as unknown as Record<string, unknown>).musicUserToken = rawToken;
-        console.log('[Tuffahi] Token set on MusicKit, isAuthorized:', mk.isAuthorized);
 
-        // Close mock popup after MusicKit processes the token
-        setTimeout(() => {
-          if (authMockWindow) authMockWindow.closed = true;
-          setTimeout(() => {
-            console.log('[Tuffahi] Post-auth check, isAuthorized:', mk.isAuthorized);
-            if (mk.isAuthorized) {
-              setIsAuthorized(true);
-            } else {
-              window.location.reload();
-            }
-          }, 1000);
-        }, 200);
-      } else {
-        window.location.reload();
+        // Give MusicKit time to process, then check
+        await new Promise((r) => setTimeout(r, 1500));
+        console.log('[Tuffahi] Post-auth check, isAuthorized:', mk.isAuthorized);
+
+        if (mk.isAuthorized) {
+          setIsAuthorized(true);
+          fetchAccountInfo();
+        } else {
+          // Re-configure MusicKit so it picks up the token from localStorage
+          console.log('[Tuffahi] Re-configuring MusicKit to pick up token...');
+          const MK = await waitForMusicKit();
+          const devToken = await window.electron.getDeveloperToken();
+          const freshInstance = await MK.configure({
+            developerToken: devToken,
+            app: { name: 'Tuffahi', build: '1.0.0' },
+          });
+          setInstance(freshInstance);
+          freshInstance.addEventListener('authorizationStatusDidChange', () => {
+            setIsAuthorized(freshInstance.isAuthorized);
+            if (freshInstance.isAuthorized) fetchAccountInfo();
+          });
+          if (freshInstance.isAuthorized) {
+            setIsAuthorized(true);
+            fetchAccountInfo();
+          }
+        }
       }
     } catch (err) {
       console.error('[Tuffahi] IPC token error:', err);
@@ -125,7 +152,7 @@ function createMusicKitStore(): MusicKitStore {
       setInstance(musicKitInstance);
       setIsConfigured(true);
 
-      // If we have a stored token from the auth bridge, inject it directly
+      // If we have a stored token from a previous auth, inject it
       if (!musicKitInstance.isAuthorized) {
         const storedToken = localStorage.getItem('music.ampwebplay.media-user-token')
           || localStorage.getItem('music.Tuffahi.media-user-token')
@@ -133,8 +160,7 @@ function createMusicKitStore(): MusicKitStore {
         if (storedToken && storedToken.length > 20) {
           console.log('[Tuffahi] Found stored token, injecting into MusicKit');
 
-          // Decode the developer JWT to get the team ID (iss claim)
-          // MusicKit stores tokens as: music.<teamId>.media-user-token
+          // Store under the correct MusicKit team-based key
           try {
             const jwtParts = developerToken.split('.');
             if (jwtParts.length === 3) {
@@ -149,19 +175,15 @@ function createMusicKitStore(): MusicKitStore {
             console.warn('[Tuffahi] Could not decode developer token JWT:', e);
           }
 
-          // Also try setting directly on the instance
+          // Set directly on the instance
           (musicKitInstance as unknown as Record<string, unknown>).musicUserToken = storedToken;
 
-          // Store under all possible key patterns
-          localStorage.setItem('music.tuffahi.media-user-token', storedToken);
-
-          // Give MusicKit a moment to pick up the token, then check
           await new Promise((r) => setTimeout(r, 500));
           console.log('[Tuffahi] After injection, isAuthorized:', musicKitInstance.isAuthorized);
 
-          // If still not authorized, try re-configuring MusicKit (it reads from localStorage on init)
+          // If still not authorized, re-configure MusicKit to pick up token from localStorage
           if (!musicKitInstance.isAuthorized) {
-            console.log('[Tuffahi] Direct injection failed, re-configuring MusicKit...');
+            console.log('[Tuffahi] Re-configuring MusicKit...');
             const freshInstance = await MK.configure({
               developerToken,
               app: { name: 'Tuffahi', build: '1.0.0' },
@@ -169,8 +191,8 @@ function createMusicKitStore(): MusicKitStore {
             setInstance(freshInstance);
             freshInstance.addEventListener('authorizationStatusDidChange', () => {
               setIsAuthorized(freshInstance.isAuthorized);
+              if (freshInstance.isAuthorized) fetchAccountInfo();
             });
-            console.log('[Tuffahi] After reconfigure, isAuthorized:', freshInstance.isAuthorized);
             if (freshInstance.isAuthorized) {
               setIsAuthorized(true);
               fetchAccountInfo();

@@ -80,13 +80,10 @@ const Player: Component<PlayerProps> = (props) => {
 
         {/* Mini Player Button */}
         <button
-          onClick={async () => {
-            try {
-              await window.electron.openMiniPlayer();
-              await window.electron.hideMainWindow();
-            } catch (err) {
+          onClick={() => {
+            window.electron.openMiniPlayer().catch((err: unknown) => {
               console.error('Failed to open mini player:', err);
-            }
+            });
           }}
           class="text-white/40 hover:text-white transition-smooth"
           title="Mini Player"

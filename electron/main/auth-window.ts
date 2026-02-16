@@ -177,33 +177,7 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
 }
 
 function injectTokenIntoMain(mainWindow: BrowserWindow, rawToken: string): void {
-  // Method 1: Send via IPC
+  // Send token to renderer via IPC — the musickit store handles the rest
   console.log('[TUFFAHI] Sending apple-music-token IPC event');
   mainWindow.webContents.send('apple-music-token', rawToken);
-
-  // Method 2: Direct JS eval (belt and suspenders)
-  const js = `(function(){
-    console.log('[Tuffahi] Direct token injection via eval');
-    localStorage.setItem('music.ampwebplay.media-user-token','${rawToken}');
-    localStorage.setItem('music.Tuffahi.media-user-token','${rawToken}');
-    localStorage.setItem('music.tuffahi.media-user-token','${rawToken}');
-    window.dispatchEvent(new MessageEvent('message',{
-      data:{thirdPartyInfo:{'music-user-token':'${rawToken}'}},
-      origin:'https://authorize.music.apple.com'
-    }));
-    console.log('[Tuffahi] Token stored in localStorage and MessageEvent dispatched');
-    setTimeout(function(){
-      if(!window.MusicKit||!window.MusicKit.getInstance||!window.MusicKit.getInstance().isAuthorized){
-        console.log('[Tuffahi] Not authorized yet, reloading...');
-        window.location.reload();
-      } else {
-        console.log('[Tuffahi] MusicKit is authorized!');
-      }
-    }, 2000);
-  })()`;
-
-  console.log(`[TUFFAHI] Evaluating JS in main window (${js.length} bytes)`);
-  mainWindow.webContents.executeJavaScript(js).catch((err) => {
-    console.error('[TUFFAHI] Failed to inject token JS:', err);
-  });
 }
