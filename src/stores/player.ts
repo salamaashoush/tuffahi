@@ -158,6 +158,11 @@ function createPlayerStore(): PlayerStore {
       // Ignore parse errors
     }
 
+    // Restore last played song so the player bar shows it on startup
+    if (!mk.nowPlayingItem) {
+      restoreLastPlayed(mk);
+    }
+
     onCleanup(() => {
       mk.removeEventListener('playbackStateDidChange', handlePlaybackStateChange);
       mk.removeEventListener('nowPlayingItemDidChange', handleNowPlayingChange);
@@ -571,6 +576,21 @@ function createPlayerStore(): PlayerStore {
     skipNextQueueSync = true;
     setState((prev) => ({ ...prev, queue: newQueue }));
     console.log('[Player] Queue reordered (local state)');
+  }
+
+  async function restoreLastPlayed(mk: MusicKit.MusicKitInstance): Promise<void> {
+    try {
+      const history = await storageService.getPlayHistory();
+      if (history.length === 0) return;
+
+      const last = history[0];
+      const queueKey = last.type.startsWith('library') ? 'songs' : 'song';
+      await mk.setQueue({ [queueKey]: last.id });
+      // setQueue populates nowPlayingItem without starting playback
+      console.log('[Player] Restored last played:', last.name);
+    } catch (err) {
+      console.warn('[Player] Failed to restore last played:', err);
+    }
   }
 
   return {
