@@ -34,8 +34,8 @@ const Sidebar: Component = () => {
     <aside class="w-56 h-full bg-surface flex flex-col border-r border-white/10">
       {/* Logo / Brand */}
       <div class="p-4 flex items-center gap-2">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center">
-          <span class="text-white text-lg">♫</span>
+        <div class="w-8 h-8 rounded-lg overflow-hidden">
+          <svg viewBox="0 0 512 512" class="w-full h-full"><defs><linearGradient id="sb" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#14B8A6"/><stop offset="50%" stop-color="#0D9488"/><stop offset="100%" stop-color="#115E59"/></linearGradient><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FCD34D"/><stop offset="100%" stop-color="#F59E0B"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#sb)"/><path d="M256 105C320 115 375 175 375 260C375 340 320 405 256 415C192 405 137 340 137 260C137 175 192 115 256 105Z" fill="#fff" fill-opacity=".93"/><g fill="url(#sb)"><rect x="198" y="240" width="16" height="70" rx="8" opacity=".75"/><rect x="228" y="200" width="16" height="120" rx="8" opacity=".8"/><rect x="258" y="170" width="16" height="160" rx="8" opacity=".85"/><rect x="288" y="210" width="16" height="110" rx="8" opacity=".8"/><rect x="318" y="250" width="16" height="60" rx="8" opacity=".75"/></g><path d="M256 105C254 88 258 70 272 55" fill="none" stroke="url(#sg)" stroke-width="6" stroke-linecap="round"/><path d="M268 62C285 48 310 45 325 52C308 62 285 68 268 62Z" fill="url(#sg)"/></svg>
         </div>
         <div class="min-w-0">
           <span class="font-semibold text-white">Tuffahi</span>
