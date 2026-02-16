@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 100">
+  <defs>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0D9488"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mini icon (inline with text) -->
+  <g transform="translate(12, 10) scale(0.155)">
+    <!-- Seed shape -->
+    <path d="
+      M 256 105
+      C 320 115, 375 175, 375 260
+      C 375 340, 320 405, 256 415
+      C 192 405, 137 340, 137 260
+      C 137 175, 192 115, 256 105 Z
+    " fill="url(#teal)"/>
+    <!-- Equalizer bars -->
+    <g fill="white">
+      <rect x="198" y="240" width="16" height="70" rx="8" opacity="0.9"/>
+      <rect x="228" y="200" width="16" height="120" rx="8" opacity="0.9"/>
+      <rect x="258" y="170" width="16" height="160" rx="8" opacity="0.95"/>
+      <rect x="288" y="210" width="16" height="110" rx="8" opacity="0.9"/>
+      <rect x="318" y="250" width="16" height="60" rx="8" opacity="0.9"/>
+    </g>
+    <!-- Gold leaf -->
+    <path d="M 256 105 C 254 88, 258 70, 272 55" fill="none" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+    <path d="M 268 62 C 285 48, 310 45, 325 52 C 308 62, 285 68, 268 62 Z" fill="url(#gold)"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="105" y="62" font-family="'Inter', 'SF Pro Display', -apple-system, sans-serif" font-size="48" font-weight="600" letter-spacing="-1" fill="url(#teal)">
+    Tuffahi
+  </text>
+
+  <!-- Arabic subtitle -->
+  <text x="105" y="88" font-family="'Noto Sans Arabic', 'Geeza Pro', 'Segoe UI', sans-serif" font-size="20" font-weight="400" fill="url(#teal)" opacity="0.6">
+    تُفَّاحِي
+  </text>
+</svg>
