@@ -1,6 +1,8 @@
 import { Component, createSignal, createResource, For, Show } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { playerStore } from '../../stores/player';
 import { storageService } from '../../services/storage';
+import { searchAPI } from '../../services/api';
 import { formatDuration } from '../../lib/musickit';
 import LazyImage from '../LazyImage/LazyImage';
 
@@ -15,7 +17,14 @@ interface HistoryEntry {
 }
 
 const PlayHistory: Component = () => {
+  const navigate = useNavigate();
   const [version, setVersion] = createSignal(0);
+
+  const navigateToArtist = async (e: MouseEvent, artistName: string) => {
+    e.stopPropagation();
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) navigate(`/artist/${artistId}`);
+  };
 
   const [entries, { refetch }] = createResource(
     version,
@@ -128,7 +137,10 @@ const PlayHistory: Component = () => {
                     <p class="text-sm font-medium text-white truncate">
                       {entry.name ?? `Song ${entry.id}`}
                     </p>
-                    <p class="text-xs text-white/60 truncate">
+                    <p
+                      class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                      onClick={(e) => navigateToArtist(e, entry.artistName ?? '')}
+                    >
                       {entry.artistName ?? 'Unknown Artist'}
                     </p>
                   </div>

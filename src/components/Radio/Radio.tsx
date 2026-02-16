@@ -21,6 +21,8 @@ interface RadioData {
   liveStations: Station[];
   featuredStations: Station[];
   genreStations: Station[];
+  personalStation: Station | null;
+  recentStations: Station[];
 }
 
 const Radio: Component = () => {
@@ -51,7 +53,21 @@ const Radio: Component = () => {
         ? ((featuredResponse.data as { results?: { stations?: { data: Station[] } } }).results?.stations?.data || []).filter((s) => !liveIds.has(s.id))
         : [];
 
-      return { liveStations, featuredStations, genreStations: [] };
+      // Fetch personal station and recent stations (requires auth)
+      let personalStation: Station | null = null;
+      let recentStations: Station[] = [];
+      try {
+        const [personalRes, recentRes] = await Promise.all([
+          mk.api.music('/v1/me/stations', { 'filter[identity]': 'personal' }).catch(() => null),
+          mk.api.music('/v1/me/recent/radio-stations', { limit: 10 }).catch(() => null),
+        ]);
+        personalStation = personalRes ? ((personalRes.data as { data: Station[] }).data?.[0] ?? null) : null;
+        recentStations = recentRes ? ((recentRes.data as { data: Station[] }).data || []) : [];
+      } catch {
+        // Not authenticated or API error — skip personal content
+      }
+
+      return { liveStations, featuredStations, genreStations: [], personalStation, recentStations };
     }
   );
 
@@ -103,6 +119,40 @@ const Radio: Component = () => {
           </div>
         }
       >
+        {/* My Station */}
+        <Show when={radioData()?.personalStation}>
+          {(station) => (
+            <section>
+              <h2 class="text-xl font-semibold text-white mb-4">My Station</h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <LiveStationCard
+                  station={station()}
+                  isPlaying={isPlaying(station().id)}
+                  onPlay={() => handlePlayStation(station())}
+                />
+              </div>
+            </section>
+          )}
+        </Show>
+
+        {/* Recently Played Stations */}
+        <Show when={(radioData()?.recentStations?.length ?? 0) > 0}>
+          <section>
+            <h2 class="text-xl font-semibold text-white mb-4">Recently Played</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <For each={radioData()?.recentStations}>
+                {(station) => (
+                  <StationCard
+                    station={station}
+                    isPlaying={isPlaying(station.id)}
+                    onPlay={() => handlePlayStation(station)}
+                  />
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
+
         {/* Apple Music Live Stations */}
         <Show when={(radioData()?.liveStations?.length ?? 0) > 0}>
           <section>

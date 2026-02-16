@@ -6,6 +6,7 @@ import { libraryStore } from '../../stores/library';
 import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
 import { useContextMenu, createTrackMenuItems } from '../ContextMenu/ContextMenu';
 import { copyShareLink } from '../../lib/share';
+import { searchAPI } from '../../services/api';
 import { ratingsStore } from '../../stores/ratings';
 import HeartButton from '../Rating/HeartButton';
 
@@ -116,6 +117,16 @@ const PlaylistPage: Component = () => {
     }
   });
 
+  // Fetch batch ratings for tracks when playlist loads
+  createEffect(() => {
+    const t = tracks();
+    if (t.length === 0 || !musicKitStore.isAuthorized()) return;
+    const trackIds = t.map(track => track.id).filter(id => id);
+    if (trackIds.length > 0) {
+      ratingsStore.fetchBatchRatings('songs', trackIds);
+    }
+  });
+
   // Check library status when playlist loads
   createEffect(() => {
     const data = playlistData();
@@ -211,6 +222,18 @@ const PlaylistPage: Component = () => {
   };
 
   const currentlyPlayingTrackId = () => playerStore.state().nowPlaying?.id;
+
+  const navigateToArtist = async (e: MouseEvent, artistName: string) => {
+    e.stopPropagation();
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) navigate(`/artist/${artistId}`);
+  };
+
+  const navigateToAlbum = async (e: MouseEvent, albumName: string, artistName?: string) => {
+    e.stopPropagation();
+    const albumId = await searchAPI.findAlbumId(albumName, artistName);
+    if (albumId) navigate(`/album/${albumId}`);
+  };
 
   return (
     <div class="pb-8">
@@ -469,14 +492,20 @@ const PlaylistPage: Component = () => {
                             <span class="ml-2 px-1.5 py-0.5 text-[10px] bg-white/20 rounded-sm uppercase">E</span>
                           </Show>
                         </p>
-                        <p class="text-xs text-white/60 truncate">
+                        <p
+                          class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                          onClick={(e) => navigateToArtist(e, track.attributes.artistName)}
+                        >
                           {track.attributes.artistName}
                         </p>
                       </div>
 
                       {/* Album Name */}
                       <div class="w-48 hidden md:block">
-                        <p class="text-sm text-white/60 truncate">
+                        <p
+                          class="text-sm text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                          onClick={(e) => navigateToAlbum(e, track.attributes.albumName, track.attributes.artistName)}
+                        >
                           {track.attributes.albumName}
                         </p>
                       </div>

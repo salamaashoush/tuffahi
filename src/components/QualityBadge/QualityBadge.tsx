@@ -2,12 +2,14 @@ import { Component, Show } from 'solid-js';
 
 interface QualityBadgeProps {
   audioTraits?: string[];
+  audioVariants?: string[];
   class?: string;
 }
 
 const QualityBadge: Component<QualityBadgeProps> = (props) => {
   const badge = () => {
-    const traits = props.audioTraits;
+    // Prefer audioVariants (from extend param), fall back to audioTraits
+    const traits = props.audioVariants ?? props.audioTraits;
     if (!traits || traits.length === 0) return null;
 
     if (traits.includes('hi-res-lossless')) {

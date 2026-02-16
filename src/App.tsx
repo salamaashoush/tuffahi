@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, createSignal, onMount, Show, onCleanup } from 'solid-js';
+import { Component, lazy, Suspense, createSignal, onMount, onCleanup, Show } from 'solid-js';
 import { Route, Router } from '@solidjs/router';
 import { useMusicKit } from './hooks/useMusicKit';
 import { useTrayEvents } from './hooks/useTrayEvents';
@@ -27,11 +27,14 @@ const Playlists = lazy(() => import('./components/Library/Playlists'));
 const RecentlyPlayedHistory = lazy(() => import('./components/Library/RecentlyPlayedHistory'));
 const PlayHistory = lazy(() => import('./components/Library/PlayHistory'));
 const Settings = lazy(() => import('./components/Settings/Settings'));
+const CuratorsPage = lazy(() => import('./components/Curators/CuratorsPage'));
+const CuratorDetailPage = lazy(() => import('./components/Curators/CuratorDetailPage'));
 
 // Lazy load heavy overlay components
 const QueuePanel = lazy(() => import('./components/Queue/QueuePanel'));
 const NowPlayingView = lazy(() => import('./components/NowPlaying/NowPlayingView'));
 const MiniPlayer = lazy(() => import('./components/MiniPlayer/MiniPlayer'));
+const VideoPlayer = lazy(() => import('./components/Video/VideoPlayer'));
 
 const LoadingSpinner: Component = () => (
   <div class="flex items-center justify-center h-full">
@@ -56,12 +59,18 @@ const AppLayout: Component<{ children?: any }> = (props) => {
   const [isQueueOpen, setIsQueueOpen] = createSignal(false);
   const [isNowPlayingOpen, setIsNowPlayingOpen] = createSignal(false);
   const [isMiniPlayerMode, setIsMiniPlayerMode] = createSignal(false);
+  let videoContainerRef: HTMLDivElement | undefined;
 
   // Initialize MusicKit on app load
   useMusicKit();
 
   // Initialize theme service and global keyboard shortcuts
   onMount(() => {
+    // Set persistent video container once — never changes
+    if (videoContainerRef) {
+      playerStore.setVideoContainer(videoContainerRef);
+    }
+
     themeService.init();
 
     setupDefaultShortcuts({
@@ -95,9 +104,45 @@ const AppLayout: Component<{ children?: any }> = (props) => {
   // Set up notifications
   useBrowserNotifications();
 
+  const videoMode = () => {
+    if (!playerStore.isVideoPlaying()) return 'hidden';
+    return isMiniPlayerMode() ? 'mini' : 'full';
+  };
+
   return (
     <ContextMenuProvider>
       <AddToPlaylistModalProvider>
+        {/* Persistent video container — lives outside <Show> so it never unmounts.
+            MusicKit creates <video> elements here; CSS controls position per mode. */}
+        <style>{`
+          .persistent-video-container video,
+          .persistent-video-container > *,
+          .persistent-video-container > * > * {
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+          }
+          .persistent-video-container video {
+            object-fit: contain !important;
+            position: absolute !important;
+            inset: 0 !important;
+            background: black !important;
+          }
+        `}</style>
+        <div
+          ref={videoContainerRef}
+          class="persistent-video-container"
+          style={{
+            position: 'fixed',
+            ...(videoMode() === 'hidden'
+              ? { left: '-9999px', width: '1px', height: '1px', overflow: 'hidden', 'pointer-events': 'none' }
+              : videoMode() === 'full'
+                ? { inset: '0', 'z-index': '60', background: 'black' }
+                : { top: '0', left: '0', right: '0', bottom: '140px', 'z-index': '20', background: 'black' }
+            ),
+          }}
+        />
+
         <Show
           when={!isMiniPlayerMode()}
           fallback={
@@ -143,6 +188,11 @@ const AppLayout: Component<{ children?: any }> = (props) => {
 
             {/* Toast Notifications */}
             <ToastContainer />
+
+            {/* Video Player Overlay */}
+            <Suspense>
+              <VideoPlayer />
+            </Suspense>
           </div>
         </Show>
       </AddToPlaylistModalProvider>
@@ -161,6 +211,8 @@ const App: Component = () => {
       <Route path="/artist/:id" component={ArtistPage} />
       <Route path="/album/:id" component={AlbumPage} />
       <Route path="/playlist/:id" component={PlaylistPage} />
+      <Route path="/curators" component={CuratorsPage} />
+      <Route path="/curator/:id" component={CuratorDetailPage} />
       <Route path="/library/recently-added" component={RecentlyPlayed} />
       <Route path="/library/artists" component={LibraryArtistsPage} />
       <Route path="/library/albums" component={LibraryAlbumsPage} />

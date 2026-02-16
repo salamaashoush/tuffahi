@@ -1,8 +1,14 @@
-import { Component, Show, createSignal, createEffect } from 'solid-js';
+import { Component, Show, createSignal, createEffect, createResource, lazy, Suspense } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { playerStore } from '../../stores/player';
+import { catalogAPI, searchAPI } from '../../services/api';
 import { formatArtworkUrl, formatTime } from '../../lib/musickit';
 import HeartButton from '../Rating/HeartButton';
+import DislikeButton from '../Rating/DislikeButton';
 import QualityBadge from '../QualityBadge/QualityBadge';
+import Waveform from '../MiniPlayer/Waveform';
+
+const LyricsView = lazy(() => import('../Lyrics/LyricsView'));
 
 interface NowPlayingViewProps {
   isOpen: boolean;
@@ -11,8 +17,18 @@ interface NowPlayingViewProps {
 
 const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
   const [dominantColor, setDominantColor] = createSignal('#1c1c1e');
+  const [showLyrics, setShowLyrics] = createSignal(false);
+  const navigate = useNavigate();
 
   const { state, currentTime, duration, togglePlayPause, skipNext, skipPrevious, seekTo, setVolume } = playerStore;
+
+  const navigateToArtist = async (artistName: string) => {
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) {
+      props.onClose();
+      navigate(`/artist/${artistId}`);
+    }
+  };
 
   // Extract dominant color from artwork
   createEffect(() => {
@@ -85,28 +101,43 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
 
         {/* Main Content */}
         <div class="flex-1 flex items-center justify-center px-8 pb-32">
-          {/* Artwork View */}
+          {/* Artwork / Lyrics View */}
           <div class="flex flex-col items-center">
             <Show when={state().nowPlaying}>
               {(nowPlaying) => (
                 <>
-                  {/* Large Artwork */}
-                  <div class="w-80 h-80 md:w-96 md:h-96 mb-8">
-                    <Show
-                      when={nowPlaying().attributes.artwork}
-                      fallback={
-                        <div class="w-full h-full bg-surface-secondary rounded-2xl flex items-center justify-center">
-                          <span class="text-8xl text-white/20">♫</span>
-                        </div>
-                      }
-                    >
-                      <img
-                        src={formatArtworkUrl(nowPlaying().attributes.artwork, 768)}
-                        alt={nowPlaying().attributes.name}
-                        class="w-full h-full object-cover rounded-2xl album-shadow-sm"
-                      />
-                    </Show>
-                  </div>
+                  <Show
+                    when={!showLyrics()}
+                    fallback={
+                      <div class="w-80 md:w-96 h-80 md:h-96 mb-8">
+                        <Suspense fallback={<div class="flex items-center justify-center h-full"><div class="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" /></div>}>
+                          <LyricsView songId={nowPlaying().id} />
+                        </Suspense>
+                      </div>
+                    }
+                  >
+                    {/* Large Artwork */}
+                    <div class="w-80 h-80 md:w-96 md:h-96 mb-8 relative">
+                      <Show
+                        when={nowPlaying().attributes.artwork}
+                        fallback={
+                          <div class="w-full h-full bg-surface-secondary rounded-2xl flex items-center justify-center">
+                            <span class="text-8xl text-white/20">♫</span>
+                          </div>
+                        }
+                      >
+                        <img
+                          src={formatArtworkUrl(nowPlaying().attributes.artwork, 768)}
+                          alt={nowPlaying().attributes.name}
+                          class="w-full h-full object-cover rounded-2xl album-shadow-sm"
+                        />
+                      </Show>
+                      {/* Waveform overlay on artwork */}
+                      <div class="absolute inset-0 rounded-2xl overflow-hidden">
+                        <Waveform />
+                      </div>
+                    </div>
+                  </Show>
 
                   {/* Track Info */}
                   <div class="text-center max-w-md">
@@ -116,10 +147,25 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                       </h1>
                       <QualityBadge audioTraits={(nowPlaying() as any).attributes.audioTraits} />
                     </div>
-                    <p class="text-lg text-white/60 mb-2">
+                    <p
+                      class="text-lg text-white/60 mb-2 hover:text-white hover:underline cursor-pointer transition-smooth"
+                      onClick={() => navigateToArtist(nowPlaying().attributes.artistName)}
+                    >
                       {nowPlaying().attributes.artistName}
                     </p>
-                    <HeartButton type="songs" id={nowPlaying().id} size="lg" />
+                    <div class="flex items-center justify-center gap-3">
+                      <HeartButton type="songs" id={nowPlaying().id} size="lg" />
+                      <DislikeButton type="songs" id={nowPlaying().id} size="lg" />
+                      <button
+                        onClick={() => setShowLyrics(!showLyrics())}
+                        class={`transition-smooth ${showLyrics() ? 'text-apple-red' : 'text-white/40 hover:text-white/80'}`}
+                        title={showLyrics() ? 'Hide Lyrics' : 'Show Lyrics'}
+                      >
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 9H7v-2h6v2zm2-4H7V5h8v2z" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

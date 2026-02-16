@@ -21,6 +21,10 @@ export interface PlayerStore {
   state: () => PlayerState;
   currentTime: () => number;
   duration: () => number;
+  playbackRate: () => number;
+  isVideoPlaying: () => boolean;
+  setPlaybackRate: (rate: number) => void;
+  setVideoContainer: (el: HTMLDivElement | null) => void;
   play: () => Promise<void>;
   pause: () => Promise<void>;
   togglePlayPause: () => Promise<void>;
@@ -33,10 +37,12 @@ export interface PlayerStore {
   setShuffleMode: (mode: ShuffleMode) => void;
   setRepeatMode: (mode: RepeatMode) => void;
   playMedia: (type: string, id: string) => Promise<void>;
+  playMusicVideos: (videoIds: string[], startIndex?: number) => Promise<void>;
   playSong: (songId: string) => Promise<void>;
   playSongs: (songIds: string[], startIndex?: number) => Promise<void>;
   playAlbum: (albumId: string, startPosition?: number) => Promise<void>;
   playPlaylist: (playlistId: string, startPosition?: number) => Promise<void>;
+  stopVideo: () => void;
   addToQueue: (id: string, playNext?: boolean, type?: string) => Promise<void>;
   clearQueueState: () => void;
   syncQueue: () => void;
@@ -59,6 +65,29 @@ function createPlayerStore(): PlayerStore {
   // the entire player bar, queue, etc. on every time tick (~4x/sec).
   const [currentTime, setCurrentTime] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
+  const [playbackRate, setPlaybackRateSignal] = createSignal(
+    (() => { try { return parseFloat(localStorage.getItem('playback-rate') || '1') || 1; } catch { return 1; } })()
+  );
+  const [isVideoPlaying, setIsVideoPlaying] = createSignal(false);
+  let videoContainerEl: HTMLDivElement | null = null;
+  // Timestamp when video mode was activated — protects against MusicKit
+  // firing nowPlayingItemDidChange(null) during queue transition
+  let videoStartedAt = 0;
+
+  function setVideoContainer(el: HTMLDivElement | null) {
+    videoContainerEl = el;
+    const mk = musicKitStore.instance();
+    if (mk && el) {
+      (mk as any).videoContainerElement = el;
+    }
+  }
+
+  function stopVideo() {
+    videoStartedAt = 0; // Clear grace period so close is immediate
+    setIsVideoPlaying(false);
+    const mk = musicKitStore.instance();
+    if (mk) mk.stop();
+  }
 
   // Lock to prevent concurrent play operations (double-click → multiple streams)
   let playLock = false;
@@ -67,6 +96,11 @@ function createPlayerStore(): PlayerStore {
   createEffect(() => {
     const mk = musicKitStore.instance();
     if (!mk) return;
+
+    // Set video container on MusicKit instance if already available
+    if (videoContainerEl) {
+      (mk as any).videoContainerElement = videoContainerEl;
+    }
 
     const handlePlaybackStateChange = (event: { state: MusicKit.PlaybackStates }) => {
       const isPlaying = event.state === MusicKit.PlaybackStates.playing;
@@ -78,6 +112,24 @@ function createPlayerStore(): PlayerStore {
 
     const handleNowPlayingChange = (event: { item: MusicKit.MediaItem | null }) => {
       setState((prev) => ({ ...prev, nowPlaying: event.item }));
+
+      // Determine if the new item is a music video
+      const itemType = event.item?.type || '';
+      const isVideoItem = itemType.includes('music-video') || itemType.includes('musicVideo');
+      const withinGracePeriod = (Date.now() - videoStartedAt) < 5000;
+
+      if (isVideoPlaying()) {
+        if (isVideoItem) {
+          videoStartedAt = Date.now();
+        } else if (!withinGracePeriod) {
+          // A non-video track genuinely started — close video overlay
+          setIsVideoPlaying(false);
+        }
+      } else if (isVideoItem) {
+        // Not in video mode but a video item started (e.g. next in queue is a video)
+        videoStartedAt = Date.now();
+        setIsVideoPlaying(true);
+      }
 
       // Update MediaSession metadata and record play history
       if (event.item?.attributes) {
@@ -158,6 +210,12 @@ function createPlayerStore(): PlayerStore {
       // Ignore parse errors
     }
 
+    // Apply saved playback rate
+    const savedRate = playbackRate();
+    if (savedRate !== 1) {
+      (mk as any).playbackRate = savedRate;
+    }
+
     // Restore last played song so the player bar shows it on startup
     if (!mk.nowPlayingItem) {
       restoreLastPlayed(mk);
@@ -221,6 +279,7 @@ function createPlayerStore(): PlayerStore {
     if (skipLock) return;
     const mk = musicKitStore.instance();
     if (!mk) return;
+    if (isVideoPlaying()) videoStartedAt = Date.now();
     skipLock = true;
     try {
       await mk.skipToNextItem();
@@ -233,6 +292,7 @@ function createPlayerStore(): PlayerStore {
     if (skipLock) return;
     const mk = musicKitStore.instance();
     if (!mk) return;
+    if (isVideoPlaying()) videoStartedAt = Date.now();
     skipLock = true;
     try {
       await mk.skipToPreviousItem();
@@ -249,6 +309,14 @@ function createPlayerStore(): PlayerStore {
   // Timestamp of last programmatic volume change — used to suppress
   // MusicKit's async playbackVolumeDidChange events that race with us.
   let lastVolumeSetAt = 0;
+
+  function setPlaybackRate(rate: number): void {
+    const clamped = Math.max(0.5, Math.min(2, rate));
+    setPlaybackRateSignal(clamped);
+    localStorage.setItem('playback-rate', String(clamped));
+    const mk = musicKitStore.instance() as any;
+    if (mk) mk.playbackRate = clamped;
+  }
 
   function setVolume(volume: number): void {
     const clamped = Math.max(0, Math.min(1, volume));
@@ -338,9 +406,20 @@ function createPlayerStore(): PlayerStore {
       switch (type) {
         case 'songs':
         case 'library-songs':
-        case 'music-videos':
           await startPlayback(async (m) => {
             await m.setQueue({ [type.startsWith('library') ? 'songs' : 'song']: id });
+            await m.play();
+          }, mk);
+          break;
+        case 'music-videos':
+          // Ensure video container is attached
+          if (videoContainerEl) {
+            (mk as any).videoContainerElement = videoContainerEl;
+          }
+          videoStartedAt = Date.now();
+          setIsVideoPlaying(true);
+          await startPlayback(async (m) => {
+            await (m as any).setQueue({ musicVideo: id });
             await m.play();
           }, mk);
           break;
@@ -373,6 +452,38 @@ function createPlayerStore(): PlayerStore {
       }
     } catch (err) {
       console.error('[Player] playMedia failed:', err);
+      // If video playback failed, close the overlay
+      if (type === 'music-videos') {
+        videoStartedAt = 0;
+        setIsVideoPlaying(false);
+      }
+    }
+  }
+
+  async function playMusicVideos(videoIds: string[], startIndex = 0): Promise<void> {
+    const mk = musicKitStore.instance();
+    if (!mk || videoIds.length === 0) return;
+
+    if (videoContainerEl) {
+      (mk as any).videoContainerElement = videoContainerEl;
+    }
+    videoStartedAt = Date.now();
+    setIsVideoPlaying(true);
+
+    try {
+      await startPlayback(async (m) => {
+        // Queue all music videos
+        await (m as any).setQueue({ musicVideos: videoIds });
+        // Skip to the desired start index
+        if (startIndex > 0) {
+          await (m as any).changeToMediaAtIndex(startIndex);
+        }
+        await m.play();
+      }, mk);
+    } catch (err) {
+      console.error('[Player] playMusicVideos failed:', err);
+      videoStartedAt = 0;
+      setIsVideoPlaying(false);
     }
   }
 
@@ -580,6 +691,10 @@ function createPlayerStore(): PlayerStore {
     state,
     currentTime,
     duration,
+    playbackRate,
+    isVideoPlaying,
+    setPlaybackRate,
+    setVideoContainer,
     play,
     pause,
     togglePlayPause,
@@ -592,10 +707,12 @@ function createPlayerStore(): PlayerStore {
     setShuffleMode,
     setRepeatMode,
     playMedia,
+    playMusicVideos,
     playSong,
     playSongs,
     playAlbum,
     playPlaylist,
+    stopVideo,
     addToQueue,
     clearQueueState,
     syncQueue,
