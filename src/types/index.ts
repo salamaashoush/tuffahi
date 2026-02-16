@@ -2,15 +2,10 @@
  * Common application types
  */
 
-// Re-export MusicKit types
-export type { MusicKit } from './musickit.d';
-
 // App Settings
 export interface AppSettings {
   audioQuality: AudioQuality;
-  crossfade: boolean;
-  crossfadeDuration: number;
-  showLyrics: boolean;
+  autoplay: boolean;
   notifications: boolean;
   miniPlayerOnClose: boolean;
   startOnLogin: boolean;
@@ -24,7 +19,7 @@ export interface AppSettings {
   customKeyBindings: Record<string, string>;
 }
 
-export type AudioQuality = 'high' | 'lossless' | 'dolby';
+export type AudioQuality = 'standard' | 'high';
 export type ThemeMode = 'dark' | 'light' | 'system' | 'custom';
 
 // Equalizer
@@ -167,6 +162,7 @@ export interface APIResult<T> {
 
 // Pagination
 export interface PaginationParams {
+  [key: string]: string | number | boolean | string[] | undefined;
   limit: number;
   offset: number;
 }
@@ -198,8 +194,11 @@ export interface CreditPerson {
 
 // Theme
 export interface CustomTheme {
+  id: string;
   name: string;
   colors: ThemeColors;
+  isBuiltIn: boolean;
+  createdAt?: number;
 }
 
 export interface ThemeColors {
@@ -209,10 +208,11 @@ export interface ThemeColors {
   surface: string;
   surfaceSecondary: string;
   surfaceTertiary: string;
-  text: string;
+  textPrimary: string;
   textSecondary: string;
-  textTertiary: string;
-  border: string;
+  textMuted: string;
+  accent: string;
+  accentHover: string;
   error: string;
   success: string;
   warning: string;
