@@ -95,6 +95,16 @@ const AlbumPage: Component = () => {
     }
   );
 
+  // Fetch batch ratings for all tracks when album loads
+  createEffect(() => {
+    const albumData = album();
+    if (!albumData || !musicKitStore.isAuthorized()) return;
+    const trackIds = albumData.relationships?.tracks?.data?.map(t => t.id).filter(id => id) || [];
+    if (trackIds.length > 0) {
+      ratingsStore.fetchBatchRatings('songs', trackIds);
+    }
+  });
+
   // Check library status when album loads
   createEffect(() => {
     const albumData = album();
@@ -246,12 +256,18 @@ const AlbumPage: Component = () => {
                   <p class="text-xl text-white/80 mb-4">
                     {albumData().attributes.artistName}
                   </p>
-                  <div class="flex items-center gap-2 text-sm text-white/60 mb-6">
+                  <div class="flex items-center gap-2 text-sm text-white/60 mb-2">
                     <span>{albumData().attributes.genreNames?.[0]}</span>
                     <span>•</span>
                     <span>{new Date(albumData().attributes.releaseDate).getFullYear()}</span>
                     <span>•</span>
                     <span>{albumData().attributes.trackCount} songs, {formatTotalDuration(totalDuration())}</span>
+                  </div>
+                  <div class="mb-6">
+                    <QualityBadge
+                      audioTraits={(albumData() as any).attributes?.audioTraits}
+                      audioVariants={(albumData() as any).attributes?.audioVariants}
+                    />
                   </div>
 
                   {/* Actions */}

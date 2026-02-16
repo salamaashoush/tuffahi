@@ -1,6 +1,8 @@
 import { Component, createResource, For, Show } from 'solid-js';
+import { useNavigate, A } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
+import { searchAPI } from '../../services/api';
 import { formatArtworkUrl } from '../../lib/musickit';
 
 interface ChartData {
@@ -10,6 +12,14 @@ interface ChartData {
 }
 
 const Browse: Component = () => {
+  const navigate = useNavigate();
+
+  const navigateToArtist = async (e: MouseEvent, artistName: string) => {
+    e.stopPropagation();
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) navigate(`/artist/${artistId}`);
+  };
+
   const [charts] = createResource(
     () => musicKitStore.instance(),
     async (mk): Promise<ChartData> => {
@@ -119,7 +129,10 @@ const Browse: Component = () => {
                           </div>
                           <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-white truncate">{song.attributes.name}</p>
-                            <p class="text-xs text-white/60 truncate">{song.attributes.artistName}</p>
+                            <p
+                              class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                              onClick={(e) => navigateToArtist(e, song.attributes.artistName)}
+                            >{song.attributes.artistName}</p>
                           </div>
                         </button>
                       )}
@@ -135,36 +148,41 @@ const Browse: Component = () => {
                   <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                     <For each={data().albums}>
                       {(album) => (
-                        <button
-                          onClick={() => handlePlayAlbum(album.id)}
-                          class="w-40 flex-shrink-0 group text-left"
-                        >
-                          <div class="relative aspect-square mb-2">
-                            <Show
-                              when={album.attributes.artwork}
-                              fallback={
-                                <div class="w-full h-full bg-surface-secondary rounded-lg flex items-center justify-center">
-                                  <span class="text-4xl text-white/20">♫</span>
+                        <div class="w-40 flex-shrink-0 group text-left">
+                          <button
+                            onClick={() => handlePlayAlbum(album.id)}
+                            class="w-full text-left"
+                          >
+                            <div class="relative aspect-square mb-2">
+                              <Show
+                                when={album.attributes.artwork}
+                                fallback={
+                                  <div class="w-full h-full bg-surface-secondary rounded-lg flex items-center justify-center">
+                                    <span class="text-4xl text-white/20">♫</span>
+                                  </div>
+                                }
+                              >
+                                <img
+                                  src={formatArtworkUrl(album.attributes.artwork, 320)}
+                                  alt={album.attributes.name}
+                                  class="w-full h-full object-cover rounded-lg album-shadow-sm"
+                                />
+                              </Show>
+                              <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                                <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
+                                  <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
                                 </div>
-                              }
-                            >
-                              <img
-                                src={formatArtworkUrl(album.attributes.artwork, 320)}
-                                alt={album.attributes.name}
-                                class="w-full h-full object-cover rounded-lg album-shadow-sm"
-                              />
-                            </Show>
-                            <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
-                              <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
                               </div>
                             </div>
-                          </div>
-                          <p class="text-sm font-medium text-white truncate">{album.attributes.name}</p>
-                          <p class="text-xs text-white/60 truncate">{album.attributes.artistName}</p>
-                        </button>
+                            <p class="text-sm font-medium text-white truncate">{album.attributes.name}</p>
+                          </button>
+                          <p
+                            class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                            onClick={(e) => navigateToArtist(e, album.attributes.artistName)}
+                          >{album.attributes.artistName}</p>
+                        </div>
                       )}
                     </For>
                   </div>
@@ -178,36 +196,38 @@ const Browse: Component = () => {
                   <div class="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                     <For each={data().playlists}>
                       {(playlist) => (
-                        <button
-                          onClick={() => handlePlayPlaylist(playlist.id)}
-                          class="w-40 flex-shrink-0 group text-left"
-                        >
-                          <div class="relative aspect-square mb-2">
-                            <Show
-                              when={playlist.attributes.artwork}
-                              fallback={
-                                <div class="w-full h-full bg-gradient-to-br from-apple-red to-apple-pink rounded-lg flex items-center justify-center">
-                                  <span class="text-4xl text-white">♫</span>
+                        <div class="w-40 flex-shrink-0 group text-left">
+                          <A href={`/playlist/${playlist.id}`} class="block">
+                            <div class="relative aspect-square mb-2">
+                              <Show
+                                when={playlist.attributes.artwork}
+                                fallback={
+                                  <div class="w-full h-full bg-gradient-to-br from-apple-red to-apple-pink rounded-lg flex items-center justify-center">
+                                    <span class="text-4xl text-white">♫</span>
+                                  </div>
+                                }
+                              >
+                                <img
+                                  src={formatArtworkUrl(playlist.attributes.artwork, 320)}
+                                  alt={playlist.attributes.name}
+                                  class="w-full h-full object-cover rounded-lg album-shadow-sm"
+                                />
+                              </Show>
+                              <div
+                                class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePlayPlaylist(playlist.id); }}
+                              >
+                                <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
+                                  <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
                                 </div>
-                              }
-                            >
-                              <img
-                                src={formatArtworkUrl(playlist.attributes.artwork, 320)}
-                                alt={playlist.attributes.name}
-                                class="w-full h-full object-cover rounded-lg album-shadow-sm"
-                              />
-                            </Show>
-                            <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
-                              <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
-                                <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
                               </div>
                             </div>
-                          </div>
-                          <p class="text-sm font-medium text-white truncate">{playlist.attributes.name}</p>
+                            <p class="text-sm font-medium text-white truncate">{playlist.attributes.name}</p>
+                          </A>
                           <p class="text-xs text-white/60">Apple Music</p>
-                        </button>
+                        </div>
                       )}
                     </For>
                   </div>

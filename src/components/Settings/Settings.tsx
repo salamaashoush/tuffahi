@@ -1,6 +1,7 @@
 import { Component, Show, createSignal, onMount } from 'solid-js';
 import { Palette } from 'lucide-solid';
 import { musicKitStore } from '../../stores/musickit';
+import { playerStore } from '../../stores/player';
 import { themeService } from '../../services/themes';
 import ThemeCustomizer from '../ThemeCustomizer/ThemeCustomizer';
 
@@ -193,6 +194,32 @@ const Settings: Component = () => {
                 />
                 <div class="w-11 h-6 bg-surface-tertiary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-apple-red"></div>
               </label>
+            </div>
+          </div>
+
+          {/* Playback Speed */}
+          <div class="p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-white font-medium">Playback Speed</p>
+                <p class="text-sm text-white/60">Adjust playback rate</p>
+              </div>
+              <select
+                value={playerStore.playbackRate()}
+                onChange={(e) => {
+                  playerStore.setPlaybackRate(parseFloat(e.currentTarget.value));
+                }}
+                class="px-3 py-2 bg-surface-tertiary rounded-lg text-white text-sm focus:outline-hidden focus:ring-2 focus:ring-apple-red cursor-pointer"
+                style={{ "color-scheme": "dark" }}
+              >
+                <option value="0.5" class="bg-surface-tertiary text-white">0.5x</option>
+                <option value="0.75" class="bg-surface-tertiary text-white">0.75x</option>
+                <option value="1" class="bg-surface-tertiary text-white">1.0x (Normal)</option>
+                <option value="1.25" class="bg-surface-tertiary text-white">1.25x</option>
+                <option value="1.5" class="bg-surface-tertiary text-white">1.5x</option>
+                <option value="1.75" class="bg-surface-tertiary text-white">1.75x</option>
+                <option value="2" class="bg-surface-tertiary text-white">2.0x</option>
+              </select>
             </div>
           </div>
 

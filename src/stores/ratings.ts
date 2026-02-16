@@ -101,12 +101,63 @@ function createRatingsStore() {
     }
   }
 
+  async function toggleDislike(type: RatingType, id: string): Promise<void> {
+    const current = getRating(type, id);
+    if (current === -1) {
+      await setRating(type, id, null);
+    } else {
+      await setRating(type, id, -1);
+    }
+  }
+
+  async function fetchBatchRatings(type: RatingType, ids: string[]): Promise<void> {
+    const mk = musicKitStore.instance();
+    if (!mk || !musicKitStore.isAuthorized()) return;
+
+    // Filter out library IDs and already-fetched IDs
+    const catalogIds = ids.filter(id => !isLibraryId(id) && !ratings().has(key(type, id)));
+    if (catalogIds.length === 0) return;
+
+    // Chunk to 100 max per request
+    const chunks: string[][] = [];
+    for (let i = 0; i < catalogIds.length; i += 100) {
+      chunks.push(catalogIds.slice(i, i + 100));
+    }
+
+    for (const chunk of chunks) {
+      try {
+        const response = await mk.api.music(`/v1/me/ratings/${type}`, {
+          ids: chunk.join(','),
+        });
+        const data = response.data as { data?: { id: string; attributes?: { value: number } }[] };
+        if (data.data) {
+          setRatings((prev) => {
+            const next = new Map(prev);
+            // Mark all requested IDs — those not in response have no rating
+            for (const id of chunk) {
+              const found = data.data!.find(item => item.id === id);
+              if (found?.attributes?.value !== undefined) {
+                const rating: RatingValue = found.attributes.value === 1 ? 1 : found.attributes.value === -1 ? -1 : null;
+                next.set(key(type, id), rating);
+              }
+            }
+            return next;
+          });
+        }
+      } catch {
+        // Ignore — ratings are optional
+      }
+    }
+  }
+
   return {
     ratings,
     getRating,
     fetchRating,
+    fetchBatchRatings,
     setRating,
     toggleLove,
+    toggleDislike,
   };
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from '@solidjs/router';
 import { libraryStore } from '../../stores/library';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
+import { searchAPI } from '../../services/api';
 import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
 
 interface LibraryProps {
@@ -51,9 +52,22 @@ const Library: Component<LibraryProps> = (props) => {
 
 const SongsView: Component = () => {
   const { state } = libraryStore;
+  const navigate = useNavigate();
 
   const handlePlay = (songId: string) => {
     playerStore.playSong(songId);
+  };
+
+  const navigateToArtist = async (e: MouseEvent, artistName: string) => {
+    e.stopPropagation();
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) navigate(`/artist/${artistId}`);
+  };
+
+  const navigateToAlbum = async (e: MouseEvent, albumName: string, artistName?: string) => {
+    e.stopPropagation();
+    const albumId = await searchAPI.findAlbumId(albumName, artistName);
+    if (albumId) navigate(`/album/${albumId}`);
   };
 
   return (
@@ -129,13 +143,19 @@ const SongsView: Component = () => {
                   <p class="text-sm font-medium text-white truncate">
                     {song.attributes.name}
                   </p>
-                  <p class="text-xs text-white/60 truncate">
+                  <p
+                    class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                    onClick={(e) => navigateToArtist(e, song.attributes.artistName)}
+                  >
                     {song.attributes.artistName}
                   </p>
                 </div>
 
                 <div class="w-40 hidden md:block">
-                  <p class="text-sm text-white/60 truncate">
+                  <p
+                    class="text-sm text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                    onClick={(e) => navigateToAlbum(e, song.attributes.albumName, song.attributes.artistName)}
+                  >
                     {song.attributes.albumName}
                   </p>
                 </div>
@@ -156,9 +176,15 @@ const SongsView: Component = () => {
 
 const AlbumsView: Component = () => {
   const { state } = libraryStore;
+  const navigate = useNavigate();
 
   const handlePlay = (albumId: string) => {
     playerStore.playAlbum(albumId);
+  };
+
+  const navigateToArtist = async (artistName: string) => {
+    const artistId = await searchAPI.findArtistId(artistName);
+    if (artistId) navigate(`/artist/${artistId}`);
   };
 
   return (
@@ -193,42 +219,47 @@ const AlbumsView: Component = () => {
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <For each={state().albums}>
             {(album) => (
-              <button
-                onClick={() => handlePlay(album.id)}
-                class="group text-left"
-              >
-                <div class="relative aspect-square mb-2">
-                  <Show
-                    when={album.attributes.artwork}
-                    fallback={
-                      <div class="w-full h-full bg-surface-secondary rounded-lg flex items-center justify-center">
-                        <span class="text-4xl text-white/20">♫</span>
-                      </div>
-                    }
-                  >
-                    <img
-                      src={formatArtworkUrl(album.attributes.artwork, 300)}
-                      alt={album.attributes.name}
-                      class="w-full h-full object-cover rounded-lg album-shadow-sm"
-                    />
-                  </Show>
+              <div class="group text-left">
+                <button
+                  onClick={() => handlePlay(album.id)}
+                  class="w-full text-left"
+                >
+                  <div class="relative aspect-square mb-2">
+                    <Show
+                      when={album.attributes.artwork}
+                      fallback={
+                        <div class="w-full h-full bg-surface-secondary rounded-lg flex items-center justify-center">
+                          <span class="text-4xl text-white/20">♫</span>
+                        </div>
+                      }
+                    >
+                      <img
+                        src={formatArtworkUrl(album.attributes.artwork, 300)}
+                        alt={album.attributes.name}
+                        class="w-full h-full object-cover rounded-lg album-shadow-sm"
+                      />
+                    </Show>
 
-                  <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
-                    <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
-                      <svg class="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
+                    <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                      <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p class="text-sm font-medium text-white truncate">
-                  {album.attributes.name}
-                </p>
-                <p class="text-xs text-white/60 truncate">
+                  <p class="text-sm font-medium text-white truncate">
+                    {album.attributes.name}
+                  </p>
+                </button>
+                <p
+                  class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
+                  onClick={() => navigateToArtist(album.attributes.artistName)}
+                >
                   {album.attributes.artistName}
                 </p>
-              </button>
+              </div>
             )}
           </For>
         </div>

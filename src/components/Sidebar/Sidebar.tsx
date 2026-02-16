@@ -15,6 +15,7 @@ const mainNavItems: NavItem[] = [
   { path: '/browse', label: 'Browse', icon: '◉' },
   { path: '/radio', label: 'Radio', icon: '◎' },
   { path: '/search', label: 'Search', icon: '⌕' },
+  { path: '/curators', label: 'Curators', icon: '♛' },
 ];
 
 const libraryNavItems: NavItem[] = [
