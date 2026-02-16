@@ -1,11 +1,11 @@
 import { Component, Show } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
-import { invoke } from '@tauri-apps/api/core';
 import { usePlayer } from '../../hooks/usePlayer';
 import { formatArtworkUrl } from '../../lib/musickit';
 import Controls from './Controls';
 import Progress from './Progress';
 import Volume from './Volume';
+import HeartButton from '../Rating/HeartButton';
+import QualityBadge from '../QualityBadge/QualityBadge';
 
 interface PlayerProps {
   onQueueClick: () => void;
@@ -14,7 +14,6 @@ interface PlayerProps {
 
 const Player: Component<PlayerProps> = (props) => {
   const { state } = usePlayer();
-  const navigate = useNavigate();
 
   return (
     <footer class="h-24 bg-surface border-t border-white/10 flex items-center px-4 gap-4">
@@ -22,26 +21,32 @@ const Player: Component<PlayerProps> = (props) => {
       <div class="w-72 flex items-center gap-3">
         <Show when={state().nowPlaying}>
           {(item) => (
-            <button
-              onClick={props.onNowPlayingClick}
-              class="flex items-center gap-3 text-left group"
-            >
-              <div class="w-14 h-14 rounded-lg overflow-hidden album-shadow flex-shrink-0 group-hover:scale-105 transition-transform">
-                <img
-                  src={formatArtworkUrl(item().attributes.artwork, 112)}
-                  alt={item().attributes.albumName}
-                  class="w-full h-full object-cover"
-                />
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-medium text-white truncate group-hover:underline">
-                  {item().attributes.name}
-                </p>
-                <p class="text-xs text-white/60 truncate">
-                  {item().attributes.artistName}
-                </p>
-              </div>
-            </button>
+            <>
+              <button
+                onClick={props.onNowPlayingClick}
+                class="flex items-center gap-3 text-left group"
+              >
+                <div class="w-14 h-14 rounded-lg overflow-hidden album-shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <img
+                    src={formatArtworkUrl(item().attributes.artwork, 112)}
+                    alt={item().attributes.albumName}
+                    class="w-full h-full object-cover"
+                  />
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <p class="text-sm font-medium text-white truncate group-hover:underline">
+                      {item().attributes.name}
+                    </p>
+                    <QualityBadge audioTraits={(item() as any).attributes.audioTraits} />
+                  </div>
+                  <p class="text-xs text-white/60 truncate">
+                    {item().attributes.artistName}
+                  </p>
+                </div>
+              </button>
+              <HeartButton type="songs" id={item().id} size="sm" />
+            </>
           )}
         </Show>
         <Show when={!state().nowPlaying}>
@@ -62,17 +67,6 @@ const Player: Component<PlayerProps> = (props) => {
 
       {/* Right Side - Volume & Actions */}
       <div class="w-72 flex items-center justify-end gap-4">
-        {/* Lyrics Button */}
-        <button
-          onClick={() => navigate('/lyrics')}
-          class="text-white/40 hover:text-white transition-smooth"
-          title="Lyrics"
-        >
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-          </svg>
-        </button>
-
         {/* Queue Button */}
         <button
           onClick={props.onQueueClick}
@@ -88,8 +82,8 @@ const Player: Component<PlayerProps> = (props) => {
         <button
           onClick={async () => {
             try {
-              await invoke('open_mini_player');
-              await invoke('hide_main_window');
+              await window.electron.openMiniPlayer();
+              await window.electron.hideMainWindow();
             } catch (err) {
               console.error('Failed to open mini player:', err);
             }
