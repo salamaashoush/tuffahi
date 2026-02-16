@@ -1,0 +1,26 @@
+appId: com.tuffahi.app
+productName: Tuffahi
+directories:
+  buildResources: resources
+  output: dist-electron
+files:
+  - out/**/*
+  - resources/**/*
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: resources/icons
+  category: Audio
+mac:
+  target:
+    - dmg
+  icon: resources/icons/icon.icns
+  category: public.app-category.music
+win:
+  target:
+    - nsis
+  icon: resources/icons/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
