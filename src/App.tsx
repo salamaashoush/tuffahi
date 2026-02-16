@@ -5,6 +5,8 @@ import { useTrayEvents } from './hooks/useTrayEvents';
 import { useMediaKeys } from './hooks/useMediaKeys';
 import { useBrowserNotifications } from './hooks/useNotifications';
 import { themeService } from './services/themes';
+import { keyboardService, setupDefaultShortcuts } from './services/keyboard';
+import { playerStore } from './stores/player';
 import Sidebar from './components/Sidebar/Sidebar';
 import Player from './components/Player/Player';
 import QueuePanel from './components/Queue/QueuePanel';
@@ -54,9 +56,17 @@ const AppLayout: Component<{ children?: any }> = (props) => {
   // Initialize MusicKit on app load
   useMusicKit();
 
-  // Initialize theme service
+  // Initialize theme service and global keyboard shortcuts
   onMount(() => {
     themeService.init();
+
+    setupDefaultShortcuts({
+      playPause: () => playerStore.togglePlayPause(),
+      next: () => playerStore.skipNext(),
+      previous: () => playerStore.skipPrevious(),
+      toggleMiniPlayer: () => window.electron.openMiniPlayer(),
+    });
+    keyboardService.init();
   });
 
   // Set up system tray event handlers
