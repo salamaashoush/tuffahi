@@ -3,7 +3,6 @@
  * Shows currently playing track in Discord
  */
 
-import { invoke } from '@tauri-apps/api/core';
 import { logger } from './logger';
 import { storageService } from './storage';
 import type { DiscordPresence } from '../types';
@@ -27,7 +26,7 @@ class DiscordService {
     if (this.isConnected) return true;
 
     try {
-      await invoke('discord_connect');
+      await window.electron.discordConnect();
       this.isConnected = true;
       logger.info('discord', 'Connected to Discord');
       return true;
@@ -42,7 +41,7 @@ class DiscordService {
     if (!this.isConnected) return;
 
     try {
-      await invoke('discord_disconnect');
+      await window.electron.discordDisconnect();
       this.isConnected = false;
       logger.info('discord', 'Disconnected from Discord');
     } catch (error) {
@@ -76,7 +75,7 @@ class DiscordService {
     if (!this.isEnabled || !this.isConnected) return;
 
     try {
-      await invoke('discord_set_activity', {
+      await window.electron.discordSetActivity({
         details: presence.details,
         state: presence.state,
         largeImageKey: presence.largeImageKey,
@@ -98,7 +97,7 @@ class DiscordService {
     if (!this.isConnected) return;
 
     try {
-      await invoke('discord_clear_activity');
+      await window.electron.discordClearActivity();
       logger.debug('discord', 'Presence cleared');
     } catch (error) {
       logger.warn('discord', 'Failed to clear presence', { error });

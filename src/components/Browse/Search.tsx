@@ -38,7 +38,7 @@ const Search: Component = () => {
       setIsSearching(true);
 
       try {
-        const response = await mk.api.music('/v1/catalog/us/search', {
+        const response = await mk.api.music('/v1/catalog/{{storefrontId}}/search', {
           term: value,
           types: 'songs,albums,artists,playlists',
           limit: 10,
@@ -98,7 +98,7 @@ const Search: Component = () => {
             placeholder="Search songs, albums, artists..."
             value={query()}
             onInput={(e) => handleSearch(e.currentTarget.value)}
-            class="w-full pl-12 pr-4 py-3 bg-surface-secondary rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red"
+            class="w-full pl-12 pr-4 py-3 bg-surface-secondary rounded-xl text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red"
           />
           <Show when={isSearching()}>
             <div class="absolute right-4 top-1/2 -translate-y-1/2">
@@ -134,7 +134,7 @@ const Search: Component = () => {
                           <Show
                             when={song.attributes.artwork}
                             fallback={
-                              <div class="w-full h-full bg-surface-secondary rounded flex items-center justify-center">
+                              <div class="w-full h-full bg-surface-secondary rounded-sm flex items-center justify-center">
                                 <span class="text-white/20">♫</span>
                               </div>
                             }
@@ -142,10 +142,10 @@ const Search: Component = () => {
                             <img
                               src={formatArtworkUrl(song.attributes.artwork, 96)}
                               alt=""
-                              class="w-full h-full object-cover rounded"
+                              class="w-full h-full object-cover rounded-sm"
                             />
                           </Show>
-                          <div class="absolute inset-0 bg-black/50 rounded opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                          <div class="absolute inset-0 bg-black/50 rounded-sm opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
                             <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M8 5v14l11-7z" />
                             </svg>
@@ -156,7 +156,7 @@ const Search: Component = () => {
                           <p class="text-xs text-white/60 truncate">{song.attributes.artistName}</p>
                         </div>
                         <span class="text-sm text-white/40">
-                          {formatDuration(song.attributes.durationInMillis)}
+                          {formatDuration(song.attributes.durationInMillis ?? 0)}
                         </span>
                       </button>
                     )}
@@ -188,7 +188,7 @@ const Search: Component = () => {
                             <img
                               src={formatArtworkUrl(album.attributes.artwork, 300)}
                               alt={album.attributes.name}
-                              class="w-full h-full object-cover rounded-lg album-shadow"
+                              class="w-full h-full object-cover rounded-lg album-shadow-sm"
                             />
                           </Show>
                           <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">

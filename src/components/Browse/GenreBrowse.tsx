@@ -68,14 +68,11 @@ const GenreBrowse: Component<GenreBrowseProps> = (props) => {
     setIsLoading(true);
     try {
       // Fetch genre-specific content
-      const [playlistsResult, albumsResult] = await Promise.all([
-        catalogAPI.getCharts('playlists', genre.id, 20),
-        catalogAPI.getCharts('albums', genre.id, 20),
-      ]);
+      const chartsResult = await catalogAPI.getCharts(['playlists', 'albums'], 20);
 
       setGenreContent({
-        playlists: playlistsResult.data || [],
-        albums: albumsResult.data || [],
+        playlists: chartsResult?.playlists?.data || [],
+        albums: chartsResult?.albums?.data || [],
       });
     } catch (error) {
       logger.error('genre-browse', 'Failed to fetch genre content', { error });

@@ -4,8 +4,9 @@ import { musicKitStore } from './musickit';
 export interface LibraryState {
   songs: MusicKit.LibrarySong[];
   albums: MusicKit.LibraryAlbum[];
+  artists: MusicKit.MediaItem[];
   playlists: MusicKit.LibraryPlaylist[];
-  recentlyAdded: MusicKit.LibraryResource[];
+  recentlyAdded: MusicKit.MediaItem[];
   isLoading: boolean;
   error: string | null;
 }
@@ -14,6 +15,7 @@ export interface LibraryStore {
   state: () => LibraryState;
   fetchSongs: (limit?: number) => Promise<void>;
   fetchAlbums: (limit?: number) => Promise<void>;
+  fetchArtists: (limit?: number) => Promise<void>;
   fetchPlaylists: (limit?: number) => Promise<void>;
   fetchRecentlyAdded: (limit?: number) => Promise<void>;
   fetchAll: () => Promise<void>;
@@ -23,6 +25,7 @@ function createLibraryStore(): LibraryStore {
   const [state, setState] = createSignal<LibraryState>({
     songs: [],
     albums: [],
+    artists: [],
     playlists: [],
     recentlyAdded: [],
     isLoading: false,
@@ -35,9 +38,11 @@ function createLibraryStore(): LibraryStore {
 
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
-      const response = await mk.api.library.songs({ limit });
-      setState((prev) => ({ ...prev, songs: response.data, isLoading: false }));
+      const response = await mk.api.music('/v1/me/library/songs', { limit });
+      const data = (response.data as { data: MusicKit.LibrarySong[] }).data || [];
+      setState((prev) => ({ ...prev, songs: data, isLoading: false }));
     } catch (err) {
+      console.error('[Library] fetchSongs failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch songs';
       setState((prev) => ({ ...prev, error: errorMessage, isLoading: false }));
     }
@@ -49,10 +54,28 @@ function createLibraryStore(): LibraryStore {
 
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
-      const response = await mk.api.library.albums({ limit });
-      setState((prev) => ({ ...prev, albums: response.data, isLoading: false }));
+      const response = await mk.api.music('/v1/me/library/albums', { limit });
+      const data = (response.data as { data: MusicKit.LibraryAlbum[] }).data || [];
+      setState((prev) => ({ ...prev, albums: data, isLoading: false }));
     } catch (err) {
+      console.error('[Library] fetchAlbums failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch albums';
+      setState((prev) => ({ ...prev, error: errorMessage, isLoading: false }));
+    }
+  }
+
+  async function fetchArtists(limit: number = 100): Promise<void> {
+    const mk = musicKitStore.instance();
+    if (!mk || !musicKitStore.isAuthorized()) return;
+
+    try {
+      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      const response = await mk.api.music('/v1/me/library/artists', { limit, include: 'catalog' });
+      const data = (response.data as { data: MusicKit.MediaItem[] }).data || [];
+      setState((prev) => ({ ...prev, artists: data, isLoading: false }));
+    } catch (err) {
+      console.error('[Library] fetchArtists failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch artists';
       setState((prev) => ({ ...prev, error: errorMessage, isLoading: false }));
     }
   }
@@ -63,9 +86,11 @@ function createLibraryStore(): LibraryStore {
 
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
-      const response = await mk.api.library.playlists({ limit });
-      setState((prev) => ({ ...prev, playlists: response.data, isLoading: false }));
+      const response = await mk.api.music('/v1/me/library/playlists', { limit });
+      const data = (response.data as { data: MusicKit.LibraryPlaylist[] }).data || [];
+      setState((prev) => ({ ...prev, playlists: data, isLoading: false }));
     } catch (err) {
+      console.error('[Library] fetchPlaylists failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch playlists';
       setState((prev) => ({ ...prev, error: errorMessage, isLoading: false }));
     }
@@ -77,9 +102,11 @@ function createLibraryStore(): LibraryStore {
 
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
-      const response = await mk.api.library.recentlyAdded({ limit });
-      setState((prev) => ({ ...prev, recentlyAdded: response.data, isLoading: false }));
+      const response = await mk.api.music('/v1/me/library/recently-added', { limit });
+      const data = (response.data as { data: MusicKit.MediaItem[] }).data || [];
+      setState((prev) => ({ ...prev, recentlyAdded: data, isLoading: false }));
     } catch (err) {
+      console.error('[Library] fetchRecentlyAdded failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch recently added';
       setState((prev) => ({ ...prev, error: errorMessage, isLoading: false }));
     }
@@ -87,7 +114,7 @@ function createLibraryStore(): LibraryStore {
 
   async function fetchAll(): Promise<void> {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
-    await Promise.all([fetchSongs(), fetchAlbums(), fetchPlaylists(), fetchRecentlyAdded()]);
+    await Promise.all([fetchSongs(), fetchAlbums(), fetchArtists(), fetchPlaylists(), fetchRecentlyAdded()]);
     setState((prev) => ({ ...prev, isLoading: false }));
   }
 
@@ -95,6 +122,7 @@ function createLibraryStore(): LibraryStore {
     state,
     fetchSongs,
     fetchAlbums,
+    fetchArtists,
     fetchPlaylists,
     fetchRecentlyAdded,
     fetchAll,

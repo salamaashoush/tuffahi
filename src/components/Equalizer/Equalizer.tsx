@@ -116,7 +116,7 @@ const Equalizer: Component<EqualizerProps> = (props) => {
           <select
             value={preset()}
             onChange={(e) => handlePresetChange(e.currentTarget.value as EqualizerPreset)}
-            class="flex-1 px-3 py-2 bg-surface-tertiary rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-apple-red"
+            class="flex-1 px-3 py-2 bg-surface-tertiary rounded-lg text-white text-sm focus:outline-hidden focus:ring-2 focus:ring-apple-red"
             style={{ "color-scheme": "dark" }}
             disabled={!isEnabled()}
           >

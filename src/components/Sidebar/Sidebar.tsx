@@ -19,6 +19,8 @@ const mainNavItems: NavItem[] = [
 
 const libraryNavItems: NavItem[] = [
   { path: '/library/recently-added', label: 'Recently Added', icon: '♦' },
+  { path: '/library/recently-played', label: 'Recently Played', icon: '♻' },
+  { path: '/library/history', label: 'Play History', icon: '⏱' },
   { path: '/library/artists', label: 'Artists', icon: '♫' },
   { path: '/library/albums', label: 'Albums', icon: '◫' },
   { path: '/library/songs', label: 'Songs', icon: '♪' },
@@ -35,7 +37,12 @@ const Sidebar: Component = () => {
         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-apple-red to-apple-pink flex items-center justify-center">
           <span class="text-white text-lg">♫</span>
         </div>
-        <span class="font-semibold text-white">Music</span>
+        <div class="min-w-0">
+          <span class="font-semibold text-white">Tuffahi</span>
+          <Show when={musicKitStore.isAuthorized() && musicKitStore.storefrontName()}>
+            <p class="text-xs text-white/40 truncate">{musicKitStore.storefrontName()}</p>
+          </Show>
+        </div>
       </div>
 
       {/* Main Navigation */}
@@ -101,7 +108,7 @@ const Sidebar: Component = () => {
                 <Show
                   when={playlist.attributes.artwork}
                   fallback={
-                    <div class="w-8 h-8 rounded bg-surface-tertiary flex items-center justify-center text-xs">
+                    <div class="w-8 h-8 rounded-sm bg-surface-tertiary flex items-center justify-center text-xs">
                       ♫
                     </div>
                   }
@@ -109,7 +116,7 @@ const Sidebar: Component = () => {
                   <img
                     src={formatArtworkUrl(playlist.attributes.artwork, 64)}
                     alt=""
-                    class="w-8 h-8 rounded"
+                    class="w-8 h-8 rounded-sm"
                   />
                 </Show>
                 <span class="truncate">{playlist.attributes.name}</span>

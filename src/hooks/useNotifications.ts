@@ -1,69 +1,10 @@
-import { createEffect, onCleanup } from 'solid-js';
-import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import { createEffect } from 'solid-js';
 import { playerStore } from '../stores/player';
 import { formatArtworkUrl } from '../lib/musickit';
 
 let previousTrackId: string | null = null;
 
-export function useNotifications() {
-  createEffect(async () => {
-    const nowPlaying = playerStore.state().nowPlaying;
-
-    // Check if we should show notification
-    if (!nowPlaying) {
-      previousTrackId = null;
-      return;
-    }
-
-    // Only show notification if track changed
-    if (nowPlaying.id === previousTrackId) {
-      return;
-    }
-
-    previousTrackId = nowPlaying.id;
-
-    // Check if notifications are enabled in settings
-    const settings = localStorage.getItem('app-settings');
-    if (settings) {
-      try {
-        const parsed = JSON.parse(settings);
-        if (parsed.notifications === false) {
-          return;
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    }
-
-    // Check permission
-    let permissionGranted = await isPermissionGranted();
-
-    if (!permissionGranted) {
-      const permission = await requestPermission();
-      permissionGranted = permission === 'granted';
-    }
-
-    if (!permissionGranted) {
-      return;
-    }
-
-    // Send notification
-    const { name, artistName, albumName, artwork } = nowPlaying.attributes;
-
-    try {
-      await sendNotification({
-        title: name,
-        body: `${artistName} — ${albumName}`,
-        // Note: icon path needs to be a local file path, not a URL
-        // For web artwork URLs, we'd need to download the image first
-      });
-    } catch (err) {
-      console.error('Failed to send notification:', err);
-    }
-  });
-}
-
-// Alternative: Browser Notification API (works in dev mode)
+// Browser Notification API (works in Electron)
 export function useBrowserNotifications() {
   createEffect(async () => {
     const nowPlaying = playerStore.state().nowPlaying;
@@ -110,7 +51,9 @@ export function useBrowserNotifications() {
       silent: true,
     });
 
-    // Auto-close after 4 seconds
-    setTimeout(() => notification.close(), 4000);
+    // Auto-close after 4 seconds (if supported)
+    if (typeof notification.close === 'function') {
+      setTimeout(() => notification.close(), 4000);
+    }
   });
 }

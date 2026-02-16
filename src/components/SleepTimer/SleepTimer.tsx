@@ -237,7 +237,7 @@ const SleepTimer: Component<SleepTimerProps> = (props) => {
                 max="480"
                 value={duration()}
                 onInput={(e) => setDuration(Math.max(1, parseInt(e.currentTarget.value) || 1))}
-                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-apple-red"
+                class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white focus:outline-hidden focus:ring-2 focus:ring-apple-red"
               />
             </div>
 
@@ -289,7 +289,7 @@ export const SleepTimerIndicator: Component<{ remainingTime: number; onClick: ()
   <Show when={props.remainingTime > 0}>
     <button
       onClick={props.onClick}
-      class="flex items-center gap-1 px-2 py-1 bg-apple-red/20 rounded text-xs text-apple-red"
+      class="flex items-center gap-1 px-2 py-1 bg-apple-red/20 rounded-sm text-xs text-apple-red"
       title="Sleep timer active"
     >
       <Clock size={12} />

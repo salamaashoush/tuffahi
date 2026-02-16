@@ -218,7 +218,7 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
                       value={customName()}
                       onInput={(e) => setCustomName(e.currentTarget.value)}
                       placeholder="My Custom Theme"
-                      class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-apple-red"
+                      class="w-full px-3 py-2 bg-surface-tertiary rounded-lg text-white placeholder-white/40 focus:outline-hidden focus:ring-2 focus:ring-apple-red"
                     />
                   </div>
 
@@ -236,7 +236,7 @@ const ThemeCustomizer: Component<ThemeCustomizerProps> = (props) => {
                         type="text"
                         value={customPrimary()}
                         onInput={(e) => setCustomPrimary(e.currentTarget.value)}
-                        class="flex-1 px-3 py-2 bg-surface-tertiary rounded-lg text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-apple-red"
+                        class="flex-1 px-3 py-2 bg-surface-tertiary rounded-lg text-white font-mono text-sm focus:outline-hidden focus:ring-2 focus:ring-apple-red"
                       />
                     </div>
                   </div>

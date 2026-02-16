@@ -143,7 +143,7 @@ const AnimatedBackground: Component<AnimatedBackgroundProps> = (props) => {
         />
       </Show>
 
-      {/* Artwork blur overlay */}
+      {/* Artwork blur-sm overlay */}
       <Show when={props.artworkUrl}>
         <div
           class={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${

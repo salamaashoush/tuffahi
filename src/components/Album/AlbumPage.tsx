@@ -1,9 +1,14 @@
-import { Component, createSignal, createEffect, For, Show } from 'solid-js';
-import { useParams } from '@solidjs/router';
+import { Component, createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
+import { useParams, useNavigate } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
 import { libraryStore } from '../../stores/library';
 import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
+import { useContextMenu, createTrackMenuItems } from '../ContextMenu/ContextMenu';
+import { copyShareLink } from '../../lib/share';
+import { ratingsStore } from '../../stores/ratings';
+import HeartButton from '../Rating/HeartButton';
+import QualityBadge from '../QualityBadge/QualityBadge';
 
 interface AlbumData {
   id: string;
@@ -62,59 +67,55 @@ interface TrackData {
 
 const AlbumPage: Component = () => {
   const params = useParams<{ id: string }>();
-  const [album, setAlbum] = createSignal<AlbumData | null>(null);
-  const [isLoading, setIsLoading] = createSignal(true);
-  const [error, setError] = createSignal<string | null>(null);
+  const navigate = useNavigate();
+  const contextMenu = useContextMenu();
   const [isInLibrary, setIsInLibrary] = createSignal(false);
-  const [dominantColor, setDominantColor] = createSignal('#1c1c1e');
 
   const isLibraryAlbum = () => params.id?.startsWith('l.');
 
-  createEffect(async () => {
-    const mk = musicKitStore.instance();
-    if (!mk || !params.id) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const endpoint = isLibraryAlbum()
-        ? `/v1/me/library/albums/${params.id}`
-        : `/v1/catalog/us/albums/${params.id}`;
+  const [album] = createResource(
+    () => {
+      const mk = musicKitStore.instance();
+      const id = params.id;
+      return mk && id ? { mk, id } : null;
+    },
+    async ({ mk, id }): Promise<AlbumData> => {
+      const endpoint = id.startsWith('l.')
+        ? `/v1/me/library/albums/${id}`
+        : `/v1/catalog/{{storefrontId}}/albums/${id}`;
 
       const response = await mk.api.music(endpoint, {
         include: 'tracks,artists',
       });
 
       const data = response.data as { data: AlbumData[] };
-      const albumData = data.data[0];
-      setAlbum(albumData);
-
-      // Extract dominant color from artwork
-      if (albumData.attributes.artwork?.bgColor) {
-        setDominantColor(`#${albumData.attributes.artwork.bgColor}`);
-      }
-
-      // Check if album is in library (for catalog albums)
-      if (!isLibraryAlbum() && musicKitStore.isAuthorized()) {
-        try {
-          const libraryCheck = await mk.api.music(
-            `/v1/me/library/albums`,
-            { 'filter[catalog-id]': params.id }
-          );
-          const libraryData = libraryCheck.data as { data: unknown[] };
-          setIsInLibrary(libraryData.data.length > 0);
-        } catch {
-          // Ignore errors checking library status
-        }
-      } else if (isLibraryAlbum()) {
-        setIsInLibrary(true);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load album');
-    } finally {
-      setIsLoading(false);
+      const albumData = data.data?.[0];
+      if (!albumData) throw new Error('Album not found');
+      return albumData;
     }
+  );
+
+  // Check library status when album loads
+  createEffect(() => {
+    const albumData = album();
+    if (!albumData) return;
+
+    if (isLibraryAlbum()) {
+      setIsInLibrary(true);
+    } else if (musicKitStore.isAuthorized()) {
+      const mk = musicKitStore.instance();
+      if (!mk) return;
+      mk.api.music<{ data: unknown[] }>('/v1/me/library/albums', { 'filter[catalog-id]': params.id })
+        .then((res) => {
+          setIsInLibrary((res.data?.data?.length ?? 0) > 0);
+        })
+        .catch(() => {});
+    }
+  });
+
+  const dominantColor = createMemo(() => {
+    const bgColor = album()?.attributes.artwork?.bgColor;
+    return bgColor ? `#${bgColor}` : '#1c1c1e';
   });
 
   const tracks = () => album()?.relationships?.tracks?.data || [];
@@ -140,12 +141,12 @@ const AlbumPage: Component = () => {
   };
 
   const handleShuffleAlbum = async () => {
-    const mk = musicKitStore.instance();
+    const mk = musicKitStore.instance() as any;
     if (!mk || !album()) return;
 
-    // Set shuffle mode and play
+    mk.shuffleMode = 1;
+    playerStore.setShuffleMode('on');
     await mk.setQueue({ album: album()!.id });
-    // MusicKit shuffle is handled via the queue
     await mk.play();
   };
 
@@ -160,13 +161,8 @@ const AlbumPage: Component = () => {
     if (!mk || !album() || isLibraryAlbum()) return;
 
     try {
-      await mk.api.music('/v1/me/library', {}, {
-        fetchOptions: {
-          method: 'POST',
-          body: JSON.stringify({
-            data: [{ id: album()!.id, type: 'albums' }]
-          })
-        }
+      await mk.api.music(`/v1/me/library?ids[albums]=${album()!.id}`, {}, {
+        fetchOptions: { method: 'POST' }
       });
       setIsInLibrary(true);
       libraryStore.fetchAlbums();
@@ -179,31 +175,31 @@ const AlbumPage: Component = () => {
 
   return (
     <div class="pb-8">
-      <Show when={error()}>
+      <Show when={album.error}>
         <div class="bg-red-500/20 border border-red-500/40 rounded-lg p-4 mb-6">
-          <p class="text-red-400">{error()}</p>
+          <p class="text-red-400">{album.error?.message || 'Failed to load album'}</p>
         </div>
       </Show>
 
       <Show
-        when={!isLoading() && album()}
+        when={!album.loading && album()}
         fallback={
           <div class="animate-pulse">
             <div class="flex gap-6 mb-8">
               <div class="w-56 h-56 bg-surface-secondary rounded-lg" />
               <div class="flex-1 pt-4">
-                <div class="h-8 bg-surface-secondary rounded w-1/2 mb-3" />
-                <div class="h-5 bg-surface-secondary rounded w-1/3 mb-6" />
-                <div class="h-4 bg-surface-secondary rounded w-1/4" />
+                <div class="h-8 bg-surface-secondary rounded-sm w-1/2 mb-3" />
+                <div class="h-5 bg-surface-secondary rounded-sm w-1/3 mb-6" />
+                <div class="h-4 bg-surface-secondary rounded-sm w-1/4" />
               </div>
             </div>
             <div class="space-y-2">
               <For each={Array(10).fill(0)}>
                 {() => (
                   <div class="flex items-center gap-4 p-3">
-                    <div class="w-6 h-4 bg-surface-secondary rounded" />
-                    <div class="flex-1 h-4 bg-surface-secondary rounded" />
-                    <div class="w-12 h-4 bg-surface-secondary rounded" />
+                    <div class="w-6 h-4 bg-surface-secondary rounded-sm" />
+                    <div class="flex-1 h-4 bg-surface-secondary rounded-sm" />
+                    <div class="w-12 h-4 bg-surface-secondary rounded-sm" />
                   </div>
                 )}
               </For>
@@ -234,7 +230,7 @@ const AlbumPage: Component = () => {
                     <img
                       src={formatArtworkUrl(albumData().attributes.artwork, 448)}
                       alt={albumData().attributes.name}
-                      class="w-56 h-56 rounded-lg album-shadow"
+                      class="w-56 h-56 rounded-lg album-shadow-sm"
                     />
                   </Show>
                 </div>
@@ -306,6 +302,43 @@ const AlbumPage: Component = () => {
                     <button
                       class="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full transition-smooth"
                       title="More Options"
+                      onClick={(e) => {
+                        const items: import('../ContextMenu/ContextMenu').MenuItem[] = [];
+                        if (!isInLibrary() && !isLibraryAlbum()) {
+                          items.push({
+                            id: 'add-to-library',
+                            label: 'Add to Library',
+                            icon: '+',
+                            onClick: handleAddToLibrary,
+                          });
+                        }
+                        items.push({
+                          id: 'play-next',
+                          label: 'Play Next',
+                          icon: '▶',
+                          onClick: () => {
+                            if (album()) playerStore.addToQueue(album()!.id, true, 'album');
+                          },
+                        });
+                        items.push({
+                          id: 'add-to-queue',
+                          label: 'Add to Queue',
+                          icon: '☰',
+                          onClick: () => {
+                            if (album()) playerStore.addToQueue(album()!.id, false, 'album');
+                          },
+                        });
+                        if (albumData().attributes.artwork) {
+                          items.push({ id: 'divider-1', label: '', divider: true });
+                          items.push({
+                            id: 'share',
+                            label: 'Copy Link',
+                            icon: '🔗',
+                            onClick: () => copyShareLink(albumData() as any),
+                          });
+                        }
+                        contextMenu.show(e.clientX, e.clientY, items);
+                      }}
                     >
                       <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -335,9 +368,9 @@ const AlbumPage: Component = () => {
                   const isPlaying = () => currentlyPlayingTrackId() === track.id;
 
                   return (
-                    <button
+                    <div
                       onClick={() => handlePlayTrack(index())}
-                      class={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-smooth group text-left ${
+                      class={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-smooth group cursor-pointer ${
                         isPlaying()
                           ? 'bg-white/10'
                           : 'hover:bg-white/5'
@@ -371,7 +404,7 @@ const AlbumPage: Component = () => {
                         <p class={`text-sm font-medium truncate ${isPlaying() ? 'text-apple-red' : 'text-white'}`}>
                           {track.attributes.name}
                           <Show when={track.attributes.isExplicit}>
-                            <span class="ml-2 px-1.5 py-0.5 text-[10px] bg-white/20 rounded uppercase">E</span>
+                            <span class="ml-2 px-1.5 py-0.5 text-[10px] bg-white/20 rounded-sm uppercase">E</span>
                           </Show>
                         </p>
                         <Show when={track.attributes.artistName !== albumData().attributes.artistName}>
@@ -382,25 +415,22 @@ const AlbumPage: Component = () => {
                       </div>
 
                       {/* Actions (show on hover) */}
-                      <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-smooth">
-                        <button
-                          class="p-1 text-white/60 hover:text-white"
-                          title="Add to Playlist"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // TODO: Show add to playlist modal
-                          }}
-                        >
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
+                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-smooth">
+                        <HeartButton type="songs" id={track.id} size="sm" skipFetch />
                         <button
                           class="p-1 text-white/60 hover:text-white"
                           title="More Options"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // TODO: Show context menu
+                            const items = createTrackMenuItems(track as any, {
+                              onPlayNext: () => playerStore.addToQueue(track.id, true, track.type || 'song'),
+                              onAddToQueue: () => playerStore.addToQueue(track.id, false, track.type || 'song'),
+                              onShare: () => copyShareLink(track as any),
+                              onLove: () => ratingsStore.setRating('songs', track.id, 1),
+                              onRemoveLove: () => ratingsStore.setRating('songs', track.id, null),
+                              isLoved: ratingsStore.getRating('songs', track.id) === 1,
+                            });
+                            contextMenu.show(e.clientX, e.clientY, items);
                           }}
                         >
                           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -413,7 +443,7 @@ const AlbumPage: Component = () => {
                       <div class="w-16 text-right text-sm text-white/60">
                         {formatDuration(track.attributes.durationInMillis)}
                       </div>
-                    </button>
+                    </div>
                   );
                 }}
               </For>

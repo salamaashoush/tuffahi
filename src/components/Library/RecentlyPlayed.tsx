@@ -6,13 +6,13 @@ import { formatArtworkUrl } from '../../lib/musickit';
 const RecentlyPlayed: Component = () => {
   const { state } = libraryStore;
 
-  const handlePlay = (item: MusicKit.LibraryResource) => {
+  const handlePlay = (item: MusicKit.MediaItem) => {
     playerStore.playMedia(item.type, item.id);
   };
 
   return (
     <div>
-      <h2 class="text-2xl font-bold text-white mb-4">Recently Added</h2>
+      <h2 class="text-2xl font-bold text-white mb-4">Recently Added to Library</h2>
 
       <Show
         when={!state().isLoading}
@@ -22,8 +22,8 @@ const RecentlyPlayed: Component = () => {
               {() => (
                 <div class="animate-pulse">
                   <div class="aspect-square bg-surface-secondary rounded-lg mb-2" />
-                  <div class="h-4 bg-surface-secondary rounded w-3/4 mb-1" />
-                  <div class="h-3 bg-surface-secondary rounded w-1/2" />
+                  <div class="h-4 bg-surface-secondary rounded-sm w-3/4 mb-1" />
+                  <div class="h-3 bg-surface-secondary rounded-sm w-1/2" />
                 </div>
               )}
             </For>
@@ -49,7 +49,7 @@ const RecentlyPlayed: Component = () => {
                     <img
                       src={formatArtworkUrl(item.attributes.artwork, 300)}
                       alt={item.attributes.name}
-                      class="w-full h-full object-cover rounded-lg album-shadow"
+                      class="w-full h-full object-cover rounded-lg album-shadow-sm"
                     />
                   </Show>
 

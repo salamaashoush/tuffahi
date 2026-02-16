@@ -22,8 +22,8 @@ const Playlists: Component = () => {
               {() => (
                 <div class="animate-pulse">
                   <div class="aspect-square bg-surface-secondary rounded-lg mb-2" />
-                  <div class="h-4 bg-surface-secondary rounded w-3/4 mb-1" />
-                  <div class="h-3 bg-surface-secondary rounded w-1/2" />
+                  <div class="h-4 bg-surface-secondary rounded-sm w-3/4 mb-1" />
+                  <div class="h-3 bg-surface-secondary rounded-sm w-1/2" />
                 </div>
               )}
             </For>
@@ -60,7 +60,7 @@ const Playlists: Component = () => {
                       <img
                         src={formatArtworkUrl(playlist.attributes.artwork, 300)}
                         alt={playlist.attributes.name}
-                        class="w-full h-full object-cover rounded-lg album-shadow"
+                        class="w-full h-full object-cover rounded-lg album-shadow-sm"
                       />
                     </Show>
 

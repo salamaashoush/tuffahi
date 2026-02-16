@@ -1,6 +1,6 @@
 /**
  * Lazy Image Component
- * Loads images on demand with blur placeholder
+ * Loads images on demand with blur-sm placeholder
  */
 
 import { Component, createSignal, onMount, Show } from 'solid-js';

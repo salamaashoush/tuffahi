@@ -53,8 +53,8 @@ const SongCredits: Component<SongCreditsProps> = (props) => {
         // Fetch song details with extended attributes
         const result = await catalogAPI.getSong(props.songId);
 
-        if (result.data) {
-          const song = result.data;
+        if (result) {
+          const song = result;
           const attrs = song.attributes;
 
           // Parse credits from song attributes
@@ -68,9 +68,9 @@ const SongCredits: Component<SongCreditsProps> = (props) => {
             performers: [
               { name: attrs?.artistName || 'Unknown Artist', role: 'Primary Artist' },
             ],
-            recordLabel: attrs?.recordLabel || 'Unknown Label',
+            recordLabel: ((song.attributes as unknown) as { recordLabel?: string })?.recordLabel || 'Unknown Label',
             releaseDate: attrs?.releaseDate || 'Unknown',
-            copyright: attrs?.copyright || '',
+            copyright: ((song.attributes as unknown) as { copyright?: string })?.copyright || '',
             isrc: attrs?.isrc || '',
             genre: attrs?.genreNames || [],
           };
@@ -136,8 +136,8 @@ const SongCredits: Component<SongCreditsProps> = (props) => {
               <div class="flex items-center gap-4">
                 <div class="w-20 h-20 rounded-lg overflow-hidden bg-surface-tertiary flex-shrink-0">
                   <LazyImage
-                    src={props.songInfo?.artworkUrl?.replace('{w}', '160').replace('{h}', '160')}
-                    alt={props.songInfo?.name}
+                    src={props.songInfo?.artworkUrl?.replace('{w}', '160').replace('{h}', '160') ?? ''}
+                    alt={props.songInfo?.name ?? ''}
                     class="w-full h-full object-cover"
                   />
                 </div>
