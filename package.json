@@ -1,6 +1,6 @@
 {
   "name": "tuffahi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tuffahi - Cross-platform music client for Apple Music built with Electron, SolidJS, and MusicKit.",
   "author": {
     "name": "Salama Ashoush",
