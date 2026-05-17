@@ -1,27 +1,57 @@
 appId: com.tuffahi.app
-electronDist: node_modules/electron/dist
 productName: Tuffahi
+copyright: Copyright © 2026 Salama Ashoush
+
+# Use the bundled Castlabs (Widevine) Electron — never re-download upstream.
+electronDist: node_modules/electron/dist
+npmRebuild: false
+
 directories:
   buildResources: resources
   output: dist-electron
+
 files:
   - out/**/*
   - resources/**/*
+
+# Stable, descriptive artifact names: Tuffahi-0.1.0-linux-x64.AppImage
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+publish:
+  provider: github
+  owner: salamaashoush
+  repo: tuffahi
+  releaseType: release
+
 linux:
   target:
     - AppImage
     - deb
   icon: resources/icons
   category: Audio
+  maintainer: Salama Ashoush <salamaashoush@gmail.com>
+  synopsis: Cross-platform Apple Music client
+
 mac:
+  # zip is required alongside dmg for electron-updater auto-updates.
   target:
     - dmg
+    - zip
   icon: resources/icons/icon.icns
   category: public.app-category.music
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
 win:
   target:
     - nsis
   icon: resources/icons/icon.ico
+
 nsis:
   oneClick: false
+  perMachine: false
   allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-setup.${ext}

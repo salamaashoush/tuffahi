@@ -1,0 +1,59 @@
+name: Release
+
+# Industry standard: tag-driven, multi-OS matrix build. Each runner builds
+# its native installers and electron-builder publishes them to the GitHub
+# Release for the tag (one release, three platforms' artifacts).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Fetch Castlabs Electron (Widevine) binary
+        # Bun does not run lifecycle scripts, so the Castlabs Electron
+        # postinstall that downloads the platform binary must run explicitly.
+        run: node node_modules/electron/install.js
+
+      - name: Build renderer/main/preload
+        run: bun run build
+
+      - name: Package & publish
+        run: bunx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional code signing — set these repo secrets to enable.
+          # macOS (Developer ID): CSC_LINK (base64 .p12), CSC_KEY_PASSWORD,
+          #   plus APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID for notarization.
+          # Windows: WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # MusicKit developer token is baked at build time by
+          # electron.vite.config.ts. APPLE_TEAM_ID is also reused by
+          # electron-builder for macOS notarization (same Apple team).
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
