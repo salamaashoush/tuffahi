@@ -1,14 +1,19 @@
 import { Component, For } from 'solid-js';
 import { playerStore } from '../../stores/player';
 
-const BAR_COUNT = 24;
+const BAR_COUNT = 48;
 
-// Pre-generate random delays and height ranges for each bar
-const bars = Array.from({ length: BAR_COUNT }, (_, i) => ({
-  delay: (Math.sin(i * 1.3) * 0.5 + 0.5) * 0.8, // 0–0.8s pseudo-random delay
-  minHeight: 15 + Math.floor((Math.sin(i * 2.1 + 1) * 0.5 + 0.5) * 10), // 15–25%
-  maxHeight: 50 + Math.floor((Math.cos(i * 1.7) * 0.5 + 0.5) * 50), // 50–100%
-}));
+// Pre-generated pseudo-random profile per bar — stable across renders.
+const bars = Array.from({ length: BAR_COUNT }, (_, i) => {
+  const n1 = Math.sin(i * 1.7 + 0.5) * 0.5 + 0.5;
+  const n2 = Math.cos(i * 0.9 + 1.3) * 0.5 + 0.5;
+  return {
+    delay: (n1 * 0.9).toFixed(2),
+    dur: (0.55 + n2 * 0.5).toFixed(2),
+    minH: 0.12 + n2 * 0.12, // idle / trough scale
+    maxH: 0.45 + n1 * 0.55, // peak scale
+  };
+});
 
 const Waveform: Component = () => {
   const isPlaying = () => playerStore.state().isPlaying;
@@ -16,28 +21,29 @@ const Waveform: Component = () => {
   return (
     <>
       <style>{`
-        @keyframes waveform-bounce {
+        @keyframes wf-bounce {
           0%, 100% { transform: scaleY(var(--wf-min)); }
-          50% { transform: scaleY(var(--wf-max)); }
+          50%      { transform: scaleY(var(--wf-max)); }
         }
       `}</style>
-      <div class="absolute inset-x-0 bottom-0 h-16 flex items-end justify-center gap-[2px] px-4 pointer-events-none">
-        {/* Backdrop gradient so bars are visible over artwork */}
-        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      <div class="absolute inset-x-0 bottom-0 h-20 flex items-end justify-center gap-[2px] px-5 pointer-events-none">
+        {/* Fade so bars read over artwork */}
+        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
         <For each={bars}>
           {(bar) => (
             <div
-              class="relative z-10 w-[6px] rounded-t-sm origin-bottom"
+              class="relative z-10 flex-1 max-w-[6px] rounded-full origin-bottom"
               style={{
-                'background': 'linear-gradient(to top, rgba(45, 212, 191, 0.9), rgba(45, 212, 191, 0.4))',
-                'height': '100%',
-                '--wf-min': `${bar.minHeight / 100}`,
-                '--wf-max': `${bar.maxHeight / 100}`,
-                'transform': isPlaying() ? undefined : `scaleY(${bar.minHeight / 100 * 0.5})`,
-                'animation': isPlaying()
-                  ? `waveform-bounce ${0.6 + bar.delay * 0.5}s ease-in-out ${bar.delay}s infinite`
+                height: '100%',
+                background: 'linear-gradient(to top, #2563eb, #38bdf8 60%, #a5f3fc)',
+                'box-shadow': isPlaying() ? '0 0 6px rgba(56,189,248,0.55)' : 'none',
+                '--wf-min': `${bar.minH}`,
+                '--wf-max': `${bar.maxH}`,
+                transform: isPlaying() ? undefined : `scaleY(${bar.minH})`,
+                animation: isPlaying()
+                  ? `wf-bounce ${bar.dur}s ease-in-out ${bar.delay}s infinite`
                   : 'none',
-                'transition': 'transform 0.4s ease-out',
+                transition: 'transform 0.45s ease-out, box-shadow 0.3s',
               }}
             />
           )}

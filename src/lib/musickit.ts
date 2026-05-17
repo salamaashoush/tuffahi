@@ -37,6 +37,6 @@ export async function waitForMusicKit(timeoutMs: number = 10000): Promise<typeof
     document.addEventListener('musickitloaded', () => {
       clearTimeout(timeout);
       resolve(window.MusicKit);
-    });
+    }, { once: true });
   });
 }

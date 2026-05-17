@@ -42,16 +42,26 @@ const Controls: Component = () => {
         title={state().isPlaying ? 'Pause' : 'Play'}
       >
         <Show
-          when={state().isPlaying}
+          when={!(state().isLoading && !state().isPlaying)}
           fallback={
-            <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
+            <svg class="w-5 h-5 text-black animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" />
             </svg>
           }
         >
-          <svg class="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
+          <Show
+            when={state().isPlaying}
+            fallback={
+              <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            }
+          >
+            <svg class="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
+          </Show>
         </Show>
       </button>
 

@@ -32,10 +32,13 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
       var DEVELOPER_TOKEN = '${developerToken}';
       var relayed = false;
 
-      function relayToken(token) {
+      function relayToken(token, source) {
         if (relayed || !token || token.length < 20) return;
         relayed = true;
-        console.log('[TUFFAHI AUTH] RELAYING TOKEN (' + token.length + ' chars)');
+        var dots = (token.match(/\\./g) || []).length;
+        console.log('[TUFFAHI AUTH] RELAYING TOKEN len=' + token.length
+          + ' dots=' + dots + ' src=' + (source || '?')
+          + ' head=' + token.slice(0, 16) + ' tail=' + token.slice(-8));
         document.title = 'TUFFAHI_TOKEN:' + token;
         setTimeout(function() {
           window.location.href = 'tuffahi-auth://token/' + encodeURIComponent(token);
@@ -53,7 +56,7 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
             if (data.method === 'authorize' && data.params && data.params[0]) {
               var token = data.params[0];
               console.log('[TUFFAHI AUTH] JSON-RPC authorize! Token: ' + token.length + ' chars');
-              relayToken(token);
+              relayToken(token, 'opener.jsonrpc.authorize');
               return;
             }
             if (data.method === 'thirdPartyInfo') {
@@ -77,7 +80,7 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
           }
           if (data && typeof data === 'object' && data.thirdPartyInfo) {
             var t = data.thirdPartyInfo['music-user-token'] || data.thirdPartyInfo['media-user-token'];
-            if (t && t.length > 20) relayToken(t);
+            if (t && t.length > 20) relayToken(t, 'opener.thirdPartyInfo');
           }
         },
         location: { href: window.location.origin + '/' },
@@ -106,7 +109,7 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
         if (event.data && event.data.jsonrpc === '2.0') {
           if (event.data.method === 'authorize' && event.data.params) {
             var token = event.data.params[0];
-            if (token && token.length > 20) relayToken(token);
+            if (token && token.length > 20) relayToken(token, 'message.jsonrpc.authorize');
           }
           return;
         }
@@ -116,7 +119,7 @@ export function openAuthWindow(mainWindow: BrowserWindow, authUrl: string): void
             var token = parsed && parsed.data && parsed.data.cookies && parsed.data.cookies['media-user-token'];
             if (token && token !== 'null' && token.length > 20) {
               console.log('[TUFFAHI AUTH] updateAuth token (' + token.length + ' chars)');
-              relayToken(token);
+              relayToken(token, 'message.mediakit.updateAuth');
             }
           } catch(e) {}
           return;

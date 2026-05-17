@@ -7,6 +7,7 @@ import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
 import { useContextMenu, createTrackMenuItems } from '../ContextMenu/ContextMenu';
 import { copyShareLink } from '../../lib/share';
 import { ratingsStore } from '../../stores/ratings';
+import MotionArtwork from '../MotionArtwork/MotionArtwork';
 import HeartButton from '../Rating/HeartButton';
 import QualityBadge from '../QualityBadge/QualityBadge';
 
@@ -92,6 +93,26 @@ const AlbumPage: Component = () => {
       const albumData = data.data?.[0];
       if (!albumData) throw new Error('Album not found');
       return albumData;
+    }
+  );
+
+  // Motion artwork — fully isolated & guarded so it can never affect the
+  // album load. Catalog-only (library ids have no editorialVideo).
+  const [albumMotion] = createResource(
+    () => {
+      const mk = musicKitStore.instance();
+      const id = params.id;
+      return mk && id && !id.startsWith('l.') ? { mk, id } : null;
+    },
+    async ({ mk, id }): Promise<Record<string, any> | null> => {
+      try {
+        const r = await mk.api.music(`/v1/catalog/{{storefrontId}}/albums/${id}`, {
+          extend: 'editorialVideo',
+        });
+        return ((r.data as { data?: any[] }).data?.[0]?.attributes?.editorialVideo ?? null);
+      } catch {
+        return null;
+      }
     }
   );
 
@@ -237,10 +258,12 @@ const AlbumPage: Component = () => {
                       </div>
                     }
                   >
-                    <img
-                      src={formatArtworkUrl(albumData().attributes.artwork, 448)}
+                    <MotionArtwork
+                      editorialVideo={albumMotion()}
+                      artwork={albumData().attributes.artwork}
                       alt={albumData().attributes.name}
-                      class="w-56 h-56 rounded-lg album-shadow-sm"
+                      size={448}
+                      class="w-56 h-56 rounded-lg album-shadow-sm overflow-hidden"
                     />
                   </Show>
                 </div>

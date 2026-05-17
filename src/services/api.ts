@@ -34,6 +34,34 @@ class APIError extends Error {
   }
 }
 
+const NON_RETRYABLE_CODES = new Set([
+  'ACCESS_DENIED',
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'INVALID_PARAMETER',
+  'INVALID_REQUEST',
+  'AUTHORIZATION_ERROR',
+]);
+
+function isNonRetryable(error: unknown): boolean {
+  const e = error as { status?: unknown; errorCode?: unknown; name?: unknown; message?: unknown };
+
+  const numericStatus = typeof e?.status === 'number' ? e.status : undefined;
+  if (numericStatus !== undefined && numericStatus >= 400 && numericStatus < 500) return true;
+
+  const code = typeof e?.errorCode === 'string' ? e.errorCode : typeof e?.name === 'string' ? e.name : '';
+  if (code && NON_RETRYABLE_CODES.has(code)) return true;
+
+  // MKError messages look like "ACCESS_DENIED: 403" or "... 404 ..."
+  const msg = typeof e?.message === 'string' ? e.message : '';
+  if (/\b4\d\d\b/.test(msg)) return true;
+  for (const c of NON_RETRYABLE_CODES) {
+    if (msg.includes(c)) return true;
+  }
+  return false;
+}
+
 async function withRetry<T>(
   fn: () => Promise<T>,
   retries = RETRY_CONFIG.maxRetries
@@ -46,9 +74,11 @@ async function withRetry<T>(
     } catch (error) {
       lastError = error as Error;
 
-      // Don't retry client errors (4xx) — they won't succeed on retry
-      const status = (error as any)?.status ?? (error as any)?.errorCode;
-      if (status && status >= 400 && status < 500) {
+      // Don't retry client errors (4xx) — they won't succeed on retry.
+      // MusicKit v3 rejects with an MKError whose code is a STRING
+      // (e.g. ACCESS_DENIED, UNAUTHORIZED), not a numeric HTTP status,
+      // so probe every shape: numeric status, string code, status in message.
+      if (isNonRetryable(error)) {
         throw lastError;
       }
 

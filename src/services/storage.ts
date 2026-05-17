@@ -201,6 +201,7 @@ class StorageService {
     position: number;
     shuffleMode: 'off' | 'on';
     repeatMode: 'none' | 'one' | 'all';
+    currentTime?: number;
   } | null> {
     return this.dbGet(STORES.QUEUE_STATE, 'queue');
   }
@@ -210,6 +211,7 @@ class StorageService {
     position: number;
     shuffleMode: 'off' | 'on';
     repeatMode: 'none' | 'one' | 'all';
+    currentTime?: number;
   }): Promise<void> {
     await this.dbSet(STORES.QUEUE_STATE, 'queue', state);
   }

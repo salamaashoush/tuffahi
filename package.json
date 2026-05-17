@@ -12,26 +12,29 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder"
+    "package": "electron-vite build && electron-builder",
+    "pack:dir": "electron-vite build && electron-builder --dir",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
-    "@solidjs/router": "^0.15.3",
-    "@tailwindcss/vite": "^4.1.18",
+    "@solidjs/router": "^0.16.1",
+    "@tailwindcss/vite": "^4.3.0",
     "discord-rpc": "^4.0.1",
-    "lucide-solid": "^0.563.0",
-    "solid-js": "^1.9.4",
-    "tailwindcss": "^4.1.18"
+    "hls.js": "^1.6.16",
+    "lucide-solid": "^1.16.0",
+    "solid-js": "^1.9.13",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.7",
-    "@types/node": "^22.10.7",
-    "dotenv": "^16.4.7",
-    "jsonwebtoken": "^9.0.2",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.8.0",
+    "dotenv": "^17.4.2",
     "electron": "github:castlabs/electron-releases#v40.1.0+wvcus",
-    "electron-builder": "^25.1.8",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.7",
-    "vite-plugin-solid": "^2.11.0"
+    "jsonwebtoken": "^9.0.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13",
+    "vite-plugin-solid": "^2.11.12"
   }
 }

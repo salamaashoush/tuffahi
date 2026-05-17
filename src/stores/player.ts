@@ -9,6 +9,8 @@ export type ShuffleMode = 'off' | 'on';
 
 export interface PlayerState {
   isPlaying: boolean;
+  /** True between a play request and audio actually starting (DRM/network). */
+  isLoading: boolean;
   volume: number;
   nowPlaying: MusicKit.MediaItem | null;
   queue: MusicKit.MediaItem[];
@@ -36,24 +38,38 @@ export interface PlayerStore {
   toggleRepeat: () => void;
   setShuffleMode: (mode: ShuffleMode) => void;
   setRepeatMode: (mode: RepeatMode) => void;
-  playMedia: (type: string, id: string) => Promise<void>;
+  playMedia: (type: string, id: string, item?: MusicKit.MediaItem) => Promise<void>;
   playMusicVideos: (videoIds: string[], startIndex?: number) => Promise<void>;
-  playSong: (songId: string) => Promise<void>;
+  playSong: (songId: string, item?: MusicKit.MediaItem) => Promise<void>;
   playSongs: (songIds: string[], startIndex?: number) => Promise<void>;
-  playAlbum: (albumId: string, startPosition?: number) => Promise<void>;
-  playPlaylist: (playlistId: string, startPosition?: number) => Promise<void>;
+  playAlbum: (albumId: string, startPosition?: number, item?: MusicKit.MediaItem) => Promise<void>;
+  playPlaylist: (playlistId: string, startPosition?: number, item?: MusicKit.MediaItem) => Promise<void>;
   stopVideo: () => void;
   addToQueue: (id: string, playNext?: boolean, type?: string) => Promise<void>;
   clearQueueState: () => void;
   syncQueue: () => void;
-  removeFromQueue: (index: number) => void;
+  removeFromQueue: (index: number) => Promise<void>;
   reorderQueue: (fromIndex: number, toIndex: number) => Promise<void>;
 }
 
+const VOLUME_KEY = 'player-volume';
+
+function readPersistedVolume(): number {
+  try {
+    const v = parseFloat(localStorage.getItem(VOLUME_KEY) ?? '1');
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 function createPlayerStore(): PlayerStore {
+  const persistedVolume = readPersistedVolume();
+
   const [state, setState] = createSignal<PlayerState>({
     isPlaying: false,
-    volume: 1,
+    isLoading: false,
+    volume: persistedVolume,
     nowPlaying: null,
     queue: [],
     queuePosition: 0,
@@ -78,7 +94,7 @@ function createPlayerStore(): PlayerStore {
     videoContainerEl = el;
     const mk = musicKitStore.instance();
     if (mk && el) {
-      (mk as any).videoContainerElement = el;
+      mk.videoContainerElement = el;
     }
   }
 
@@ -89,8 +105,13 @@ function createPlayerStore(): PlayerStore {
     if (mk) mk.stop();
   }
 
-  // Lock to prevent concurrent play operations (double-click → multiple streams)
-  let playLock = false;
+  // Play requests are token-based, not a hard lock. A new request for a
+  // DIFFERENT target supersedes an in-flight one (so clicks during the
+  // 1–3s DRM/network load aren't silently dropped). Identical rapid
+  // double-clicks on the SAME target are deduped.
+  let playToken = 0;
+  let lastPlayKey = '';
+  let lastPlayAt = 0;
 
   // Subscribe to MusicKit events when instance is available
   createEffect(() => {
@@ -99,15 +120,16 @@ function createPlayerStore(): PlayerStore {
 
     // Set video container on MusicKit instance if already available
     if (videoContainerEl) {
-      (mk as any).videoContainerElement = videoContainerEl;
+      mk.videoContainerElement = videoContainerEl;
     }
 
     const handlePlaybackStateChange = (event: { state: MusicKit.PlaybackStates }) => {
       const isPlaying = event.state === MusicKit.PlaybackStates.playing;
-      setState((prev) => ({ ...prev, isPlaying }));
+      // Audio is actually running → loading is over.
+      setState((prev) => ({ ...prev, isPlaying, isLoading: isPlaying ? false : prev.isLoading }));
       updateMediaSessionPlaybackState(isPlaying);
-      // Release play lock once playback actually starts or stops
-      if (isPlaying) playLock = false;
+      // Snapshot session on pause/stop so the offset survives a restart.
+      if (!isPlaying) persistSession(true);
     };
 
     const handleNowPlayingChange = (event: { item: MusicKit.MediaItem | null }) => {
@@ -155,6 +177,7 @@ function createPlayerStore(): PlayerStore {
       if (dur > 0) {
         updateMediaSessionPositionState(dur, event.currentPlaybackTime);
       }
+      persistSession(); // throttled (~5s) — keeps resume offset fresh
     };
 
     const handleDurationChange = (event: { duration: number }) => {
@@ -164,13 +187,21 @@ function createPlayerStore(): PlayerStore {
       }
     };
 
+    // MusicKit is the source of truth for the queue. Mirror its items
+    // verbatim — no optimistic local splices, no suppression flags.
     const handleQueueChange = (event: { items: MusicKit.MediaItem[] }) => {
-      if (skipNextQueueSync) {
-        skipNextQueueSync = false;
-        return;
-      }
       const items = (event.items || []).filter((item) => item != null);
       setState((prev) => ({ ...prev, queue: items }));
+      persistSession(true);
+    };
+
+    const handleQueuePositionChange = (event: { position: number; item: MusicKit.MediaItem | null }) => {
+      setState((prev) => ({
+        ...prev,
+        queuePosition: event.position,
+        ...(event.item ? { nowPlaying: event.item } : {}),
+      }));
+      persistSession(true);
     };
 
     const handleVolumeChange = (event: { volume: number }) => {
@@ -185,16 +216,22 @@ function createPlayerStore(): PlayerStore {
     mk.addEventListener('playbackTimeDidChange', handleTimeChange);
     mk.addEventListener('playbackDurationDidChange', handleDurationChange);
     mk.addEventListener('queueItemsDidChange', handleQueueChange);
+    mk.addEventListener('queuePositionDidChange', handleQueuePositionChange);
     mk.addEventListener('playbackVolumeDidChange', handleVolumeChange);
+
+    // Apply the persisted volume to MusicKit (its default is 1).
+    mk.volume = persistedVolume;
 
     // Set initial state
     setState((prev) => ({
       ...prev,
-      volume: mk.volume,
+      volume: persistedVolume,
       nowPlaying: mk.nowPlayingItem,
       isPlaying: mk.playbackState === MusicKit.PlaybackStates.playing,
-      shuffleMode: (mk as any).shuffleMode === 1 ? 'on' : 'off',
-      repeatMode: getRepeatModeFromMK((mk as any).repeatMode),
+      queue: Array.from(mk.queue?.items || []).filter((item) => item != null),
+      queuePosition: mk.queue?.position ?? 0,
+      shuffleMode: mk.shuffleMode === 1 ? 'on' : 'off',
+      repeatMode: getRepeatModeFromMK(mk.repeatMode),
     }));
 
     // Apply autoplay setting from localStorage
@@ -203,7 +240,7 @@ function createPlayerStore(): PlayerStore {
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         if (parsed.autoplay !== undefined) {
-          (mk as any).autoplayEnabled = parsed.autoplay;
+          mk.autoplayEnabled = parsed.autoplay;
         }
       }
     } catch {
@@ -213,12 +250,18 @@ function createPlayerStore(): PlayerStore {
     // Apply saved playback rate
     const savedRate = playbackRate();
     if (savedRate !== 1) {
-      (mk as any).playbackRate = savedRate;
+      mk.playbackRate = savedRate;
     }
 
-    // Restore last played song so the player bar shows it on startup
+    // Restore the full session (queue + position + offset). Fall back to
+    // the single last-played track if no saved session exists. Enable
+    // persistence only after restore so we don't overwrite it with empties.
     if (!mk.nowPlayingItem) {
-      restoreLastPlayed(mk);
+      restoreSession(mk)
+        .then((ok) => (ok ? true : restoreLastPlayed(mk).then(() => false)))
+        .finally(() => { sessionRestored = true; });
+    } else {
+      sessionRestored = true;
     }
 
     onCleanup(() => {
@@ -227,6 +270,7 @@ function createPlayerStore(): PlayerStore {
       mk.removeEventListener('playbackTimeDidChange', handleTimeChange);
       mk.removeEventListener('playbackDurationDidChange', handleDurationChange);
       mk.removeEventListener('queueItemsDidChange', handleQueueChange);
+      mk.removeEventListener('queuePositionDidChange', handleQueuePositionChange);
       mk.removeEventListener('playbackVolumeDidChange', handleVolumeChange);
     });
   });
@@ -314,7 +358,7 @@ function createPlayerStore(): PlayerStore {
     const clamped = Math.max(0.5, Math.min(2, rate));
     setPlaybackRateSignal(clamped);
     localStorage.setItem('playback-rate', String(clamped));
-    const mk = musicKitStore.instance() as any;
+    const mk = musicKitStore.instance();
     if (mk) mk.playbackRate = clamped;
   }
 
@@ -322,15 +366,21 @@ function createPlayerStore(): PlayerStore {
     const clamped = Math.max(0, Math.min(1, volume));
     lastVolumeSetAt = Date.now();
     setState((prev) => ({ ...prev, volume: clamped }));
+    try {
+      localStorage.setItem(VOLUME_KEY, String(clamped));
+    } catch {
+      // localStorage unavailable — volume just won't persist
+    }
     const mk = musicKitStore.instance();
     if (mk) mk.volume = clamped;
   }
 
   function setShuffleMode(mode: ShuffleMode): void {
-    const mk = musicKitStore.instance() as any;
+    const mk = musicKitStore.instance();
     if (mk) {
       mk.shuffleMode = mode === 'on' ? 1 : 0;
       setState((prev) => ({ ...prev, shuffleMode: mode }));
+      persistSession(true);
     }
   }
 
@@ -340,11 +390,12 @@ function createPlayerStore(): PlayerStore {
   }
 
   function setRepeatMode(mode: RepeatMode): void {
-    const mk = musicKitStore.instance() as any;
+    const mk = musicKitStore.instance();
     if (mk) {
       const mkMode = mode === 'one' ? 1 : mode === 'all' ? 2 : 0;
       mk.repeatMode = mkMode;
       setState((prev) => ({ ...prev, repeatMode: mode }));
+      persistSession(true);
     }
   }
 
@@ -360,30 +411,61 @@ function createPlayerStore(): PlayerStore {
     setRepeatMode(newMode);
   }
 
+  interface StartOpts {
+    /** Stable target id (e.g. "album:123") — same key + rapid repeat = deduped. */
+    key?: string;
+    /** Show this item immediately while MusicKit resolves the real track. */
+    optimistic?: MusicKit.MediaItem | null;
+  }
+
   /**
-   * Start playback, guarded by playLock to prevent concurrent play operations.
-   * Resets time/duration immediately for instant UI feedback.
+   * Start playback. Token-based: a new request for a different target
+   * supersedes an in-flight one; identical rapid repeats are deduped.
+   * Sets isLoading immediately so the UI reacts on click.
    */
   async function startPlayback(
     queueSetter: (mk: MusicKit.MusicKitInstance) => Promise<void>,
-    mk: MusicKit.MusicKitInstance
+    mk: MusicKit.MusicKitInstance,
+    opts: StartOpts = {}
   ): Promise<void> {
-    if (playLock) return;
-    playLock = true;
+    const now = Date.now();
+    const key = opts.key ?? '';
+    // Dedupe: same target clicked again within 600ms while still loading.
+    if (key && key === lastPlayKey && now - lastPlayAt < 600 && state().isLoading) {
+      return;
+    }
+    lastPlayKey = key;
+    lastPlayAt = now;
 
-    // Immediate UI feedback: reset time so progress bar clears
+    const token = ++playToken; // supersedes any in-flight request
+    const isCurrent = () => token === playToken;
+
+    // Immediate UI feedback: loading on, progress cleared, optimistic item.
+    setState((prev) => ({
+      ...prev,
+      isLoading: true,
+      ...(opts.optimistic ? { nowPlaying: opts.optimistic } : {}),
+    }));
     setCurrentTime(0);
     setDuration(0);
 
     try {
       await queueSetter(mk);
     } catch (err) {
-      playLock = false;
+      if (isCurrent()) setState((prev) => ({ ...prev, isLoading: false }));
       throw err;
     }
-    // playLock is released in handlePlaybackStateChange when playback starts
-    // Safety timeout in case the event never fires
-    setTimeout(() => { playLock = false; }, 5000);
+
+    if (!isCurrent()) return; // superseded by a newer request — stand down
+
+    // MusicKit v3 does NOT emit queueItemsDidChange for setQueue — pull the
+    // new queue into state so the Queue view populates immediately.
+    syncQueue();
+
+    // Safety: clear loading if the playing event never arrives.
+    setTimeout(() => {
+      if (isCurrent()) setState((prev) => ({ ...prev, isLoading: false }));
+    }, 2500);
   }
 
   async function playStation(stationId: string): Promise<void> {
@@ -393,10 +475,10 @@ function createPlayerStore(): PlayerStore {
     await startPlayback(async (m) => {
       await m.setQueue({ station: stationId });
       await m.play();
-    }, mk);
+    }, mk, { key: `station:${stationId}` });
   }
 
-  async function playMedia(type: string, id: string): Promise<void> {
+  async function playMedia(type: string, id: string, item?: MusicKit.MediaItem): Promise<void> {
     const mk = musicKitStore.instance();
     if (!mk) return;
 
@@ -409,27 +491,27 @@ function createPlayerStore(): PlayerStore {
           await startPlayback(async (m) => {
             await m.setQueue({ [type.startsWith('library') ? 'songs' : 'song']: id });
             await m.play();
-          }, mk);
+          }, mk, { key: `${type}:${id}`, optimistic: item ?? null });
           break;
         case 'music-videos':
           // Ensure video container is attached
           if (videoContainerEl) {
-            (mk as any).videoContainerElement = videoContainerEl;
+            mk.videoContainerElement = videoContainerEl;
           }
           videoStartedAt = Date.now();
           setIsVideoPlaying(true);
           await startPlayback(async (m) => {
-            await (m as any).setQueue({ musicVideo: id });
+            await m.setQueue({ musicVideo: id });
             await m.play();
-          }, mk);
+          }, mk, { key: `mv:${id}`, optimistic: item ?? null });
           break;
         case 'albums':
         case 'library-albums':
-          await playAlbum(id);
+          await playAlbum(id, 0, item);
           break;
         case 'playlists':
         case 'library-playlists':
-          await playPlaylist(id);
+          await playPlaylist(id, 0, item);
           break;
         case 'stations':
         case 'station':
@@ -446,7 +528,7 @@ function createPlayerStore(): PlayerStore {
             await startPlayback(async (m) => {
               await m.setQueue({ song: id });
               await m.play();
-            }, mk);
+            }, mk, { key: `song:${id}`, optimistic: item ?? null });
           }
           break;
       }
@@ -465,7 +547,7 @@ function createPlayerStore(): PlayerStore {
     if (!mk || videoIds.length === 0) return;
 
     if (videoContainerEl) {
-      (mk as any).videoContainerElement = videoContainerEl;
+      mk.videoContainerElement = videoContainerEl;
     }
     videoStartedAt = Date.now();
     setIsVideoPlaying(true);
@@ -473,13 +555,13 @@ function createPlayerStore(): PlayerStore {
     try {
       await startPlayback(async (m) => {
         // Queue all music videos
-        await (m as any).setQueue({ musicVideos: videoIds });
+        await m.setQueue({ musicVideos: videoIds });
         // Skip to the desired start index
         if (startIndex > 0) {
-          await (m as any).changeToMediaAtIndex(startIndex);
+          await m.changeToMediaAtIndex(startIndex);
         }
         await m.play();
-      }, mk);
+      }, mk, { key: `mvs:${videoIds[0]}:${startIndex}` });
     } catch (err) {
       console.error('[Player] playMusicVideos failed:', err);
       videoStartedAt = 0;
@@ -487,7 +569,7 @@ function createPlayerStore(): PlayerStore {
     }
   }
 
-  async function playSong(songId: string): Promise<void> {
+  async function playSong(songId: string, item?: MusicKit.MediaItem): Promise<void> {
     const mk = musicKitStore.instance();
     if (!mk) return;
 
@@ -495,7 +577,7 @@ function createPlayerStore(): PlayerStore {
       await startPlayback(async (m) => {
         await m.setQueue({ song: songId });
         await m.play();
-      }, mk);
+      }, mk, { key: `song:${songId}`, optimistic: item ?? null });
     } catch (err) {
       console.error('[Player] playSong failed:', songId, err);
     }
@@ -508,7 +590,7 @@ function createPlayerStore(): PlayerStore {
     await startPlayback(async (m) => {
       await m.setQueue({ songs: songIds, startWith: startIndex });
       await m.play();
-    }, mk);
+    }, mk, { key: `songs:${songIds[0]}:${startIndex}` });
   }
 
   async function playAtIndex(mk: MusicKit.MusicKitInstance, startIndex: number): Promise<void> {
@@ -523,7 +605,7 @@ function createPlayerStore(): PlayerStore {
     }
   }
 
-  async function playAlbum(albumId: string, startIndex: number = 0): Promise<void> {
+  async function playAlbum(albumId: string, startIndex: number = 0, item?: MusicKit.MediaItem): Promise<void> {
     const mk = musicKitStore.instance();
     if (!mk) return;
 
@@ -531,13 +613,13 @@ function createPlayerStore(): PlayerStore {
       await startPlayback(async (m) => {
         await m.setQueue({ album: albumId });
         await playAtIndex(m, startIndex);
-      }, mk);
+      }, mk, { key: `album:${albumId}:${startIndex}`, optimistic: item ?? null });
     } catch (err) {
       console.error('[Player] playAlbum failed:', err);
     }
   }
 
-  async function playPlaylist(playlistId: string, startIndex: number = 0): Promise<void> {
+  async function playPlaylist(playlistId: string, startIndex: number = 0, item?: MusicKit.MediaItem): Promise<void> {
     const mk = musicKitStore.instance();
     if (!mk) return;
 
@@ -545,35 +627,88 @@ function createPlayerStore(): PlayerStore {
       await startPlayback(async (m) => {
         await m.setQueue({ playlist: playlistId });
         await playAtIndex(m, startIndex);
-      }, mk);
+      }, mk, { key: `playlist:${playlistId}:${startIndex}`, optimistic: item ?? null });
     } catch (err) {
       console.error('[Player] playPlaylist failed:', err);
     }
   }
 
-  // Flag to skip the next queueItemsDidChange event (after manual remove/reorder)
-  let skipNextQueueSync = false;
-
+  // Re-derive queue + position from MusicKit's own queue (the source of
+  // truth). queueItemsDidChange normally handles this; syncQueue is the
+  // explicit pull used right after a mutation, since MusicKit updates its
+  // internal queue asynchronously and may not emit for every operation.
   function syncQueue(): void {
-    // Small delay to let MusicKit update its internal queue
     setTimeout(() => {
-      if (skipNextQueueSync) {
-        skipNextQueueSync = false;
-        return;
-      }
-      const mk = musicKitStore.instance() as any;
+      const mk = musicKitStore.instance();
       if (!mk) return;
-      const items = mk.queue?.items || [];
-      const validItems = Array.from(items).filter((item: any) => item != null);
-      setState((prev) => ({ ...prev, queue: validItems }));
+      const items = Array.from(mk.queue?.items || []).filter((item) => item != null);
+      setState((prev) => ({
+        ...prev,
+        queue: items,
+        queuePosition: mk.queue?.position ?? prev.queuePosition,
+      }));
+      persistSession(true);
     }, 50);
   }
 
+  // ── Session persistence ────────────────────────────────────────────────
+  // Save queue + position + playback offset so the session resumes after a
+  // restart. Guarded by sessionRestored so we never clobber the saved
+  // session with empty state before restore runs.
+  let sessionRestored = false;
+  let lastPersistAt = 0;
+
+  function persistSession(force = false): void {
+    if (!sessionRestored) return;
+    const now = Date.now();
+    if (!force && now - lastPersistAt < 5000) return;
+    lastPersistAt = now;
+
+    const s = state();
+    if (s.queue.length === 0) return;
+    void storageService.saveQueueState({
+      items: s.queue.map((i) => ({ id: i.id, type: i.type })),
+      position: s.queuePosition,
+      shuffleMode: s.shuffleMode,
+      repeatMode: s.repeatMode,
+      currentTime: currentTime(),
+    });
+  }
+
+  async function restoreSession(mk: MusicKit.MusicKitInstance): Promise<boolean> {
+    try {
+      const saved = await storageService.getQueueState();
+      if (!saved || !saved.items?.length) return false;
+
+      await mk.setQueue({
+        items: saved.items.map((i) => ({
+          id: i.id,
+          type: i.type as MusicKit.MediaItemType,
+        })),
+        startWith: saved.position ?? 0,
+      });
+
+      if (saved.currentTime && saved.currentTime > 1) {
+        // Best effort — seeking pre-playback is flaky on some MusicKit builds.
+        try { await mk.seekToTime(saved.currentTime); } catch { /* ignore */ }
+      }
+      setShuffleMode(saved.shuffleMode ?? 'off');
+      setRepeatMode(saved.repeatMode ?? 'none');
+      syncQueue();
+      // Restored paused — user presses play to resume from the saved offset.
+      console.log('[Player] Session restored:', saved.items.length, 'items @', saved.position);
+      return true;
+    } catch (err) {
+      console.warn('[Player] restoreSession failed:', err);
+      return false;
+    }
+  }
+
   async function addToQueue(id: string, playNext: boolean = false, type: string = 'song'): Promise<void> {
-    const mk = musicKitStore.instance() as any;
+    const mk = musicKitStore.instance();
     if (!mk) return;
 
-    let descriptor: Record<string, string>;
+    let descriptor: MusicKit.SetQueueOptions;
     switch (type) {
       case 'songs':
       case 'library-songs':
@@ -630,46 +765,94 @@ function createPlayerStore(): PlayerStore {
       queuePosition: 0,
       nowPlaying: null,
       isPlaying: false,
+      isLoading: false,
     }));
     setCurrentTime(0);
     setDuration(0);
+    // Clear the persisted session so a cleared queue stays cleared on restart.
+    void storageService.clearQueueState();
   }
 
-  function removeFromQueue(index: number): void {
-    const mk = musicKitStore.instance() as any;
+  async function removeFromQueue(index: number): Promise<void> {
+    const mk = musicKitStore.instance();
     if (!mk) return;
 
     const currentQueue = state().queue;
     if (index < 0 || index >= currentQueue.length) return;
 
-    const newQueue = [...currentQueue];
-    newQueue.splice(index, 1);
-    skipNextQueueSync = true;
-    setState((prev) => ({ ...prev, queue: newQueue }));
-
+    // Mutate MusicKit's queue, then mirror its resulting truth. No
+    // optimistic local splice — that's what desynced UI from playback.
     if (mk.queue && typeof mk.queue.remove === 'function') {
       try {
         mk.queue.remove(index);
-        console.log('[Player] queue.remove succeeded for index', index);
       } catch (err) {
         console.error('[Player] queue.remove failed:', err);
       }
+      syncQueue();
+      return;
+    }
+
+    // Older MusicKit without Queue.remove: rebuild from remaining items,
+    // keeping the currently-playing track selected.
+    try {
+      const remaining = currentQueue.filter((_, i) => i !== index);
+      const playingIndex = mk.queue?.position ?? 0;
+      const newStart = index < playingIndex ? playingIndex - 1 : playingIndex;
+      await mk.setQueue({
+        items: remaining.map((it) => ({ id: it.id, type: it.type })),
+        startWith: Math.max(0, newStart),
+      });
+      syncQueue();
+    } catch (err) {
+      console.error('[Player] removeFromQueue rebuild failed:', err);
     }
   }
 
   async function reorderQueue(fromIndex: number, toIndex: number): Promise<void> {
+    const mk = musicKitStore.instance();
     const currentQueue = state().queue;
-    if (!currentQueue.length || fromIndex === toIndex) return;
+    if (!mk || !currentQueue.length || fromIndex === toIndex) return;
     if (fromIndex < 0 || fromIndex >= currentQueue.length) return;
     if (toIndex < 0 || toIndex >= currentQueue.length) return;
 
-    const newQueue = [...currentQueue];
-    const [moved] = newQueue.splice(fromIndex, 1);
-    newQueue.splice(toIndex, 0, moved);
+    // MusicKit JS v3 has no public queue-reorder API. Move the item in
+    // MusicKit's internal _queueItems array in place (keeping the same
+    // reference), then nudge it to recompute derived state. This avoids
+    // restarting the current track. Internals are undocumented — fall
+    // back to a full setQueue rebuild if the shape isn't as expected.
+    const q = mk.queue as unknown as {
+      _queueItems?: unknown[];
+      _reindex?: () => void;
+      _updateQueueItems?: () => void;
+    };
+    const internal = q?._queueItems;
 
-    skipNextQueueSync = true;
-    setState((prev) => ({ ...prev, queue: newQueue }));
-    console.log('[Player] Queue reordered (local state)');
+    if (Array.isArray(internal) && internal.length === currentQueue.length) {
+      const [moved] = internal.splice(fromIndex, 1);
+      internal.splice(toIndex, 0, moved);
+      try {
+        if (typeof q._reindex === 'function') q._reindex();
+        else if (typeof q._updateQueueItems === 'function') q._updateQueueItems();
+      } catch (err) {
+        console.error('[Player] queue reindex hook failed:', err);
+      }
+      syncQueue();
+      return;
+    }
+
+    // Fallback: rebuild the queue deterministically (restarts current item).
+    const reordered = [...currentQueue];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    try {
+      await mk.setQueue({
+        items: reordered.map((it) => ({ id: it.id, type: it.type })),
+        startWith: mk.queue?.position ?? 0,
+      });
+      syncQueue();
+    } catch (err) {
+      console.error('[Player] reorderQueue rebuild failed:', err);
+    }
   }
 
   async function restoreLastPlayed(mk: MusicKit.MusicKitInstance): Promise<void> {

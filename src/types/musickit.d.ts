@@ -33,7 +33,8 @@ declare namespace MusicKit {
   interface MusicKitInstance {
     // Properties
     readonly isAuthorized: boolean;
-    readonly musicUserToken: string;
+    // Writable in v3: external token injection assigns this to authorize.
+    musicUserToken: string;
     readonly storefrontId: string;
     readonly storefrontCountryCode: string;
     playbackState: PlaybackStates;
@@ -41,11 +42,15 @@ declare namespace MusicKit {
     nowPlayingItem: MediaItem | null;
     queue: Queue;
     volume: number;
-    playbackTime: number;
+    currentPlaybackTime: number;
+    currentPlaybackTimeRemaining: number;
     currentPlaybackDuration: number;
     currentPlaybackProgress: number;
     repeatMode: PlayerRepeatMode;
     shuffleMode: PlayerShuffleMode;
+    playbackRate: number;
+    autoplayEnabled: boolean;
+    videoContainerElement: HTMLElement | null;
 
     // Authorization
     authorize(): Promise<string>;
@@ -64,6 +69,8 @@ declare namespace MusicKit {
     // Queue Management
     setQueue(options: SetQueueOptions): Promise<Queue>;
     clearQueue(): Promise<void>;
+    playNext(options: SetQueueOptions): Promise<void>;
+    playLater(options: SetQueueOptions): Promise<void>;
 
     // API Access
     api: API;
@@ -309,6 +316,9 @@ declare namespace MusicKit {
     isEmpty: boolean;
     nextPlayableItem: MediaItem | null;
     previousPlayableItem: MediaItem | null;
+    remove(index: number): void;
+    append(options: SetQueueOptions): void;
+    prepend(options: SetQueueOptions): void;
   }
 
   interface SetQueueOptions {
@@ -317,6 +327,8 @@ declare namespace MusicKit {
     album?: string;
     playlist?: string;
     station?: string;
+    musicVideo?: string;
+    musicVideos?: string[];
     url?: string;
     items?: MediaItemDescriptor[];
     startPosition?: number;

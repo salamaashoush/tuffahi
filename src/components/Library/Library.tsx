@@ -1,5 +1,5 @@
 import { Component, For, Show, onMount } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { useNavigate, A } from '@solidjs/router';
 import { libraryStore } from '../../stores/library';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
@@ -220,10 +220,7 @@ const AlbumsView: Component = () => {
           <For each={state().albums}>
             {(album) => (
               <div class="group text-left">
-                <button
-                  onClick={() => handlePlay(album.id)}
-                  class="w-full text-left"
-                >
+                <A href={`/album/${album.id}`} class="block w-full text-left">
                   <div class="relative aspect-square mb-2">
                     <Show
                       when={album.attributes.artwork}
@@ -240,19 +237,27 @@ const AlbumsView: Component = () => {
                       />
                     </Show>
 
-                    <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handlePlay(album.id);
+                      }}
+                      class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center"
+                      title="Play"
+                    >
                       <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
                         <svg class="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </div>
-                    </div>
+                    </button>
                   </div>
 
-                  <p class="text-sm font-medium text-white truncate">
+                  <p class="text-sm font-medium text-white truncate hover:underline">
                     {album.attributes.name}
                   </p>
-                </button>
+                </A>
                 <p
                   class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
                   onClick={() => navigateToArtist(album.attributes.artistName)}
@@ -309,35 +314,39 @@ const ArtistsView: Component = () => {
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           <For each={state().artists}>
             {(artist) => {
-              const catalogId = () => artist.relationships?.catalog?.data?.[0]?.id;
+              // Library artists carry no artwork — resolve it (and a real
+              // navigable id) from the included catalog relationship.
+              const cat = () => (artist as any).relationships?.catalog?.data?.[0];
+              const artwork = () => artist.attributes?.artwork ?? cat()?.attributes?.artwork;
+              const name = () => artist.attributes?.name ?? cat()?.attributes?.name ?? 'Unknown Artist';
+              const catalogId = () => cat()?.id;
 
               return (
                 <button
                   onClick={() => {
                     const cid = catalogId();
-                    if (cid) {
-                      navigate(`/artist/${cid}`);
-                    }
+                    if (cid) navigate(`/artist/${cid}`);
                   }}
                   class="group flex flex-col items-center text-center"
                 >
-                  <div class="relative w-32 h-32 mb-2">
+                  <div class="relative w-36 h-36 mb-3 rounded-full overflow-hidden ring-1 ring-white/10 group-hover:ring-white/30 shadow-lg shadow-black/40 transition-all">
                     <Show
-                      when={artist.attributes?.artwork}
+                      when={artwork()}
                       fallback={
-                        <div class="w-full h-full bg-surface-secondary rounded-full flex items-center justify-center">
+                        <div class="w-full h-full bg-surface-secondary flex items-center justify-center">
                           <span class="text-4xl text-white/20">&#9835;</span>
                         </div>
                       }
                     >
                       <img
-                        src={formatArtworkUrl(artist.attributes.artwork, 256)}
-                        alt={artist.attributes.name}
-                        class="w-full h-full object-cover rounded-full"
+                        src={formatArtworkUrl(artwork(), 320)}
+                        alt={name()}
+                        loading="lazy"
+                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </Show>
-                    <div class="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
-                      <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                      <div class="w-11 h-11 bg-white/90 rounded-full flex items-center justify-center">
                         <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z" />
                         </svg>
@@ -345,8 +354,8 @@ const ArtistsView: Component = () => {
                     </div>
                   </div>
 
-                  <p class="text-sm font-medium text-white truncate max-w-[140px]">
-                    {artist.attributes?.name}
+                  <p class="text-sm font-semibold text-white truncate max-w-[150px] group-hover:underline">
+                    {name()}
                   </p>
                 </button>
               );

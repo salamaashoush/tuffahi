@@ -1,4 +1,4 @@
-import { Component, Show } from 'solid-js';
+import { Component, Show, For, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { usePlayer } from '../../hooks/usePlayer';
 import { formatArtworkUrl } from '../../lib/musickit';
@@ -17,9 +17,12 @@ interface PlayerProps {
   onNowPlayingClick: () => void;
 }
 
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+
 const Player: Component<PlayerProps> = (props) => {
   const { state } = usePlayer();
   const navigate = useNavigate();
+  const [speedOpen, setSpeedOpen] = createSignal(false);
 
   const navigateToArtist = async (artistName: string) => {
     const artistId = await searchAPI.findArtistId(artistName);
@@ -27,7 +30,7 @@ const Player: Component<PlayerProps> = (props) => {
   };
 
   return (
-    <footer class="h-24 bg-surface border-t border-white/10 flex items-center px-4 gap-4">
+    <footer class="h-24 bg-surface/95 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_28px_rgba(0,0,0,0.4)] flex items-center px-6 gap-6">
       {/* Now Playing Info */}
       <div class="w-72 flex items-center gap-3">
         <Show when={state().nowPlaying}>
@@ -36,7 +39,8 @@ const Player: Component<PlayerProps> = (props) => {
               <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button
                   onClick={props.onNowPlayingClick}
-                  class="w-14 h-14 rounded-lg overflow-hidden album-shadow-sm flex-shrink-0 hover:scale-105 transition-transform"
+                  class="w-14 h-14 rounded-xl overflow-hidden ring-1 ring-white/10 shadow-lg shadow-black/40 flex-shrink-0 hover:scale-105 transition-transform"
+                  title="Open Now Playing"
                 >
                   <img
                     src={formatArtworkUrl(item().attributes.artwork, 112)}
@@ -84,17 +88,40 @@ const Player: Component<PlayerProps> = (props) => {
       </div>
 
       {/* Right Side - Volume & Actions */}
-      <div class="w-72 flex items-center justify-end gap-4">
-        {/* Speed Badge */}
-        <Show when={playerStore.playbackRate() !== 1}>
+      <div class="w-72 flex items-center justify-end gap-4 relative">
+        {/* Playback Speed */}
+        <div class="relative">
           <button
-            onClick={() => playerStore.setPlaybackRate(1)}
-            class="text-xs font-medium px-1.5 py-0.5 rounded bg-white/10 text-white/80 hover:bg-white/20 transition-smooth"
-            title="Reset speed to 1.0x"
+            onClick={() => setSpeedOpen((v) => !v)}
+            class={`px-2 py-1 rounded-lg text-xs font-semibold tabular-nums transition-smooth ${
+              playerStore.playbackRate() !== 1
+                ? 'bg-apple-red/20 text-apple-red'
+                : 'text-white/50 hover:text-white hover:bg-white/10'
+            }`}
+            title="Playback speed"
           >
-            {playerStore.playbackRate()}x
+            {playerStore.playbackRate()}×
           </button>
-        </Show>
+          <Show when={speedOpen()}>
+            <div class="fixed inset-0 z-40" onClick={() => setSpeedOpen(false)} />
+            <div class="absolute bottom-full right-0 mb-2 z-50 w-28 bg-surface-secondary border border-white/10 rounded-xl shadow-2xl shadow-black/50 py-1.5 overflow-hidden">
+              <For each={SPEEDS}>
+                {(s) => (
+                  <button
+                    onClick={() => { playerStore.setPlaybackRate(s); setSpeedOpen(false); }}
+                    class={`w-full px-3 py-1.5 text-left text-sm transition-smooth ${
+                      playerStore.playbackRate() === s
+                        ? 'text-apple-red font-semibold bg-white/5'
+                        : 'text-white/70 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {s === 1 ? 'Normal' : `${s}×`}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
 
         {/* AirPlay Button */}
         <Show when={typeof (musicKitStore.instance() as any)?.showPlaybackTargetPicker === 'function'}>
@@ -103,7 +130,7 @@ const Player: Component<PlayerProps> = (props) => {
               const mk = musicKitStore.instance() as any;
               mk?.showPlaybackTargetPicker?.();
             }}
-            class="text-white/40 hover:text-white transition-smooth"
+            class="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-smooth"
             title="AirPlay"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -115,7 +142,7 @@ const Player: Component<PlayerProps> = (props) => {
         {/* Queue Button */}
         <button
           onClick={props.onQueueClick}
-          class="text-white/40 hover:text-white transition-smooth"
+          class="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-smooth"
           title="Queue"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -130,7 +157,7 @@ const Player: Component<PlayerProps> = (props) => {
               console.error('Failed to open mini player:', err);
             });
           }}
-          class="text-white/40 hover:text-white transition-smooth"
+          class="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-smooth"
           title="Mini Player"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
