@@ -6,6 +6,15 @@
 bun run release patch     # or: minor | major | 1.2.3
 ```
 
+## Linux one-line install (end users)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/salamaashoush/tuffahi/main/scripts/install.sh | bash
+```
+
+Auto-picks `.pacman` (Arch), `.deb` (Debian/Ubuntu), else `.AppImage`
+from the latest release. Linux artifacts: AppImage, deb, **pacman**.
+
 Bumps the version, commits, tags `vX.Y.Z`, pushes. The **Release** GitHub
 Actions workflow then builds installers on Linux, macOS and Windows and
 publishes them to the GitHub Release for that tag.

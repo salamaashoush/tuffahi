@@ -27,6 +27,7 @@ linux:
   target:
     - AppImage
     - deb
+    - pacman
   icon: resources/icons
   category: Audio
   maintainer: Salama Ashoush <salamaashoush@gmail.com>
