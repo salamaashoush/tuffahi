@@ -149,10 +149,7 @@ const Browse: Component = () => {
                     <For each={data().albums}>
                       {(album) => (
                         <div class="w-40 flex-shrink-0 group text-left">
-                          <button
-                            onClick={() => handlePlayAlbum(album.id)}
-                            class="w-full text-left"
-                          >
+                          <A href={`/album/${album.id}`} class="block w-full text-left">
                             <div class="relative aspect-square mb-2">
                               <Show
                                 when={album.attributes.artwork}
@@ -168,16 +165,24 @@ const Browse: Component = () => {
                                   class="w-full h-full object-cover rounded-lg album-shadow-sm"
                                 />
                               </Show>
-                              <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handlePlayAlbum(album.id);
+                                }}
+                                class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center"
+                                title="Play"
+                              >
                                 <div class="w-10 h-10 bg-white/90 rounded-full flex items-center justify-center">
                                   <svg class="w-5 h-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M8 5v14l11-7z" />
                                   </svg>
                                 </div>
-                              </div>
+                              </button>
                             </div>
-                            <p class="text-sm font-medium text-white truncate">{album.attributes.name}</p>
-                          </button>
+                            <p class="text-sm font-medium text-white truncate hover:underline">{album.attributes.name}</p>
+                          </A>
                           <p
                             class="text-xs text-white/60 truncate hover:text-white hover:underline cursor-pointer"
                             onClick={(e) => navigateToArtist(e, album.attributes.artistName)}

@@ -97,7 +97,7 @@ function createSplashWindow(): void {
 
 // ─── Main Window ──────────────────────────────────────────────────────────────
 function createMainWindow(): void {
-  const preloadPath = join(__dirname, '../preload/index.mjs');
+  const preloadPath = join(__dirname, '../preload/index.js');
 
   mainWindow = new BrowserWindow({
     width: 1280,

@@ -16,7 +16,9 @@ interface NowPlayingViewProps {
 }
 
 const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
-  const [dominantColor, setDominantColor] = createSignal('#1c1c1e');
+  const [accentColor, setAccentColor] = createSignal('#3a3a3c');
+  const [textPrimary, setTextPrimary] = createSignal('#ffffff');
+  const [textSecondary, setTextSecondary] = createSignal('rgba(255,255,255,0.6)');
   const [showLyrics, setShowLyrics] = createSignal(false);
   const navigate = useNavigate();
 
@@ -30,12 +32,16 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     }
   };
 
-  // Extract dominant color from artwork
+  // Blue-based theme with a subtle artwork-tinted glow. Text stays white
+  // for consistent contrast over the deep-blue gradient.
   createEffect(() => {
-    const nowPlaying = state().nowPlaying;
-    if (nowPlaying?.attributes.artwork) {
-      setDominantColor('#2c2c2e');
-    }
+    const art = state().nowPlaying?.attributes.artwork as
+      | { bgColor?: string; textColor4?: string }
+      | undefined;
+    const hex = (c?: string) => (c ? (c.startsWith('#') ? c : `#${c}`) : undefined);
+    setAccentColor(hex(art?.textColor4) ?? hex(art?.bgColor) ?? '#3b82f6');
+    setTextPrimary('#ffffff');
+    setTextSecondary('rgba(255,255,255,0.7)');
   });
 
   const progress = () => {
@@ -45,13 +51,6 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
     return (ct / dur) * 100;
   };
 
-  const handleSeek = (e: MouseEvent) => {
-    const target = e.currentTarget as HTMLDivElement;
-    const rect = target.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    const time = percent * duration();
-    seekTo(time);
-  };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -67,13 +66,27 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {/* Background with gradient */}
-      <div
-        class="absolute inset-0 transition-colors duration-1000"
-        style={{
-          background: `linear-gradient(to bottom, ${dominantColor()}, #000000)`
-        }}
-      />
+      {/* Ambient backdrop: blurred + dimmed album art under a gradient */}
+      <div class="absolute inset-0 overflow-hidden bg-black">
+        <Show when={state().nowPlaying?.attributes.artwork}>
+          <img
+            src={formatArtworkUrl(state().nowPlaying!.attributes.artwork, 1200)}
+            alt=""
+            class="absolute inset-0 w-full h-full object-cover transition-all duration-1000"
+            style={{
+              filter: 'blur(28px) saturate(1.5) brightness(0.38)',
+              transform: 'scale(1.15)',
+            }}
+          />
+        </Show>
+        {/* Tint + vignette so text/controls stay readable */}
+        <div
+          class="absolute inset-0 transition-all duration-1000"
+          style={{
+            background: `radial-gradient(120% 80% at 50% -10%, ${accentColor()}33 0%, transparent 55%), linear-gradient(180deg, rgba(6,10,26,0.62) 0%, rgba(5,8,20,0.78) 45%, rgba(2,3,9,0.93) 75%, #000 100%)`,
+          }}
+        />
+      </div>
 
       {/* Content */}
       <div class="relative h-full flex flex-col">
@@ -89,9 +102,9 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
           </button>
 
           <div class="text-center">
-            <p class="text-xs text-white/60 uppercase tracking-wider">Now Playing</p>
+            <p class="text-xs uppercase tracking-wider" style={{ color: textSecondary() }}>Now Playing</p>
             <Show when={state().nowPlaying}>
-              <p class="text-sm text-white/80">{state().nowPlaying!.attributes.albumName}</p>
+              <p class="text-sm" style={{ color: textSecondary() }}>{state().nowPlaying!.attributes.albumName}</p>
             </Show>
           </div>
 
@@ -142,13 +155,14 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                   {/* Track Info */}
                   <div class="text-center max-w-md">
                     <div class="flex items-center justify-center gap-2 mb-1">
-                      <h1 class="text-2xl font-bold text-white truncate">
+                      <h1 class="text-2xl font-bold truncate" style={{ color: textPrimary() }}>
                         {nowPlaying().attributes.name}
                       </h1>
                       <QualityBadge audioTraits={(nowPlaying() as any).attributes.audioTraits} />
                     </div>
                     <p
-                      class="text-lg text-white/60 mb-2 hover:text-white hover:underline cursor-pointer transition-smooth"
+                      class="text-lg mb-2 hover:underline cursor-pointer transition-smooth"
+                      style={{ color: textSecondary() }}
                       onClick={() => navigateToArtist(nowPlaying().attributes.artistName)}
                     >
                       {nowPlaying().attributes.artistName}
@@ -178,18 +192,30 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
           <div class="max-w-2xl mx-auto">
             {/* Progress Bar */}
             <div class="mb-4">
-              <div
-                class="h-1.5 bg-white/20 rounded-full cursor-pointer group"
-                onClick={handleSeek}
-              >
-                <div
-                  class="h-full bg-white rounded-full relative"
-                  style={{ width: `${progress()}%` }}
-                >
-                  <div class="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
-                </div>
-              </div>
-              <div class="flex justify-between mt-1 text-xs text-white/60">
+              <style>{`
+                input.np-progress { -webkit-appearance:none; appearance:none; height:6px; border-radius:9999px; background:transparent; cursor:pointer; }
+                input.np-progress::-webkit-slider-runnable-track { height:6px; border-radius:9999px; }
+                input.np-progress::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:9999px; background:#fff; margin-top:-4px; box-shadow:0 1px 4px rgba(0,0,0,.5); transition:transform .15s; }
+                input.np-progress:hover::-webkit-slider-thumb { transform:scale(1.25); }
+                input.np-progress::-moz-range-thumb { width:14px; height:14px; border:none; border-radius:9999px; background:#fff; }
+                input.np-volume { -webkit-appearance:none; appearance:none; height:3px; border-radius:9999px; background:transparent; cursor:pointer; }
+                input.np-volume::-webkit-slider-runnable-track { height:3px; border-radius:9999px; }
+                input.np-volume::-webkit-slider-thumb { -webkit-appearance:none; width:10px; height:10px; border-radius:9999px; background:#fff; margin-top:-3.5px; box-shadow:0 1px 3px rgba(0,0,0,.5); }
+                input.np-volume::-moz-range-thumb { width:10px; height:10px; border:none; border-radius:9999px; background:#fff; }
+              `}</style>
+              <input
+                type="range"
+                class="np-progress w-full"
+                min="0"
+                max={duration() || 0}
+                step="0.1"
+                value={Math.min(currentTime(), duration() || 0)}
+                onInput={(e) => seekTo(parseFloat(e.currentTarget.value))}
+                style={{
+                  background: `linear-gradient(to right, #ffffff 0%, #ffffff ${progress()}%, rgba(255,255,255,0.2) ${progress()}%, rgba(255,255,255,0.2) 100%)`,
+                }}
+              />
+              <div class="flex justify-between mt-1 text-xs" style={{ color: textSecondary() }}>
                 <span>{formatTime(currentTime())}</span>
                 <span>{formatTime(duration())}</span>
               </div>
@@ -269,7 +295,10 @@ const NowPlayingView: Component<NowPlayingViewProps> = (props) => {
                 step="0.01"
                 value={state().volume}
                 onInput={(e) => setVolume(parseFloat(e.currentTarget.value))}
-                class="w-32 accent-white"
+                class="np-volume w-32"
+                style={{
+                  background: `linear-gradient(to right, #ffffff 0%, #ffffff ${state().volume * 100}%, rgba(255,255,255,0.2) ${state().volume * 100}%, rgba(255,255,255,0.2) 100%)`,
+                }}
               />
               <svg class="w-4 h-4 text-white/40" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />

@@ -20,10 +20,15 @@ const QueuePanel: Component<QueuePanelProps> = (props) => {
   const queue = () => playerStore.state().queue;
   const nowPlaying = () => playerStore.state().nowPlaying;
 
+  // Prefer MusicKit's authoritative queue position; fall back to id match
+  // only when it's out of range (id match breaks when a track repeats).
   const currentIndex = createMemo(() => {
-    const np = nowPlaying();
     const q = queue();
-    if (!np || q.length === 0) return -1;
+    if (q.length === 0) return -1;
+    const pos = playerStore.state().queuePosition;
+    if (pos >= 0 && pos < q.length) return pos;
+    const np = nowPlaying();
+    if (!np) return -1;
     return q.findIndex((item) => item?.id === np.id);
   });
 

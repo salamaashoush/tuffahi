@@ -81,13 +81,25 @@ const AppLayout: Component<{ children?: any }> = (props) => {
     });
     keyboardService.init();
 
-    // Listen for mini player mode transitions from main process
+    // Listen for mini player mode transitions from main process and
+    // persist the choice so it survives an app restart.
     const unEnter = window.electron.onEnterMiniPlayer(() => {
       setIsMiniPlayerMode(true);
+      try { localStorage.setItem('mini-player-mode', 'true'); } catch { /* ignore */ }
     });
     const unExit = window.electron.onExitMiniPlayer(() => {
       setIsMiniPlayerMode(false);
+      try { localStorage.setItem('mini-player-mode', 'false'); } catch { /* ignore */ }
     });
+
+    // Restore mini player mode from last session.
+    try {
+      if (localStorage.getItem('mini-player-mode') === 'true') {
+        window.electron.openMiniPlayer().catch(() => { /* ignore */ });
+      }
+    } catch {
+      // localStorage unavailable — skip restore
+    }
 
     onCleanup(() => {
       unEnter();
@@ -151,7 +163,7 @@ const AppLayout: Component<{ children?: any }> = (props) => {
             </Suspense>
           }
         >
-          <div class="h-screen flex flex-col bg-black no-select">
+          <div class="h-screen flex flex-col bg-background no-select">
             <div class="flex-1 flex overflow-hidden">
               {/* Sidebar */}
               <Sidebar />

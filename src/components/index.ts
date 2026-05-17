@@ -14,7 +14,6 @@ export { VirtualList, VirtualGrid } from './VirtualList/VirtualList';
 export { LazyImage, ArtworkImage } from './LazyImage/LazyImage';
 
 // Player Features
-export { default as Equalizer } from './Equalizer/Equalizer';
 export { default as SleepTimer, SleepTimerIndicator } from './SleepTimer/SleepTimer';
 
 // Playlist Management
