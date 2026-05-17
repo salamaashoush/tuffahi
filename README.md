@@ -8,166 +8,84 @@
   An <strong>unofficial</strong> cross-platform Apple Music client built with <strong>Electron</strong>, <strong>SolidJS</strong>, and <strong>MusicKit JS</strong>.
 </p>
 
-> **Disclaimer:** This is an unofficial third-party client. Not affiliated with or endorsed by Apple Inc. Requires an Apple Music subscription.
+> **Disclaimer:** Unofficial third-party client. Not affiliated with or endorsed by Apple Inc. Requires an Apple Music subscription.
 
 ## Features
 
-- Browse Apple Music catalog (Top Charts, Featured Playlists, Genres)
-- Search for songs, albums, artists, and playlists
-- Access your Apple Music library (songs, albums, playlists, recently added)
-- Full playback controls with progress bar, volume, shuffle, and repeat
-- Mini player mode (compact always-on-top window)
-- Now Playing view with large artwork display
-- Queue management
-- Audio quality selection (Standard 64 kbps / High 256 kbps)
-- Discord Rich Presence integration
+- Browse the Apple Music catalog (charts, genres, curators, featured playlists)
+- Search songs, albums, artists, playlists
+- Your library (songs, albums, artists, playlists, recently added)
+- Full playback: progress, volume, shuffle, repeat, queue, mini player
+- Now Playing with ambient artwork backdrop & synced lyrics
+- Session persistence (queue/position resume after restart)
+- Song ratings (love / dislike), share links
+- Discord Rich Presence, system tray, media keys, sleep timer
 - Customizable themes
-- System tray integration with quick controls
-- Keyboard shortcuts for media control
-- Song ratings (love/dislike)
-- Sleep timer
-- Play history tracking
-- Cross-platform support (Linux, macOS, Windows)
+- Linux & Windows builds
 
-## Prerequisites
+## Install (prebuilt, Linux)
 
-- [Node.js](https://nodejs.org/) (v18+)
-- An [Apple Developer account](https://developer.apple.com/) with a MusicKit key
+```bash
+curl -fsSL https://raw.githubusercontent.com/salamaashoush/tuffahi/main/scripts/install.sh | bash
+```
 
-## Setup
+Auto-picks `.pacman` (Arch), `.deb` (Debian/Ubuntu) or `.AppImage`.
+Windows: download the `-setup.exe` from the
+[latest release](https://github.com/salamaashoush/tuffahi/releases/latest).
 
-1. Clone the repository:
+> macOS is not built — Apple ships a native Apple Music app.
+
+## Build from source
+
+Prerequisites: [Bun](https://bun.sh), an
+[Apple Developer account](https://developer.apple.com/) with a MusicKit key.
+
 ```bash
 git clone https://github.com/salamaashoush/tuffahi.git
 cd tuffahi
+bun install
+# Bun skips lifecycle scripts — fetch the Castlabs (Widevine) Electron binary:
+node node_modules/electron/install.js
+cp .env.example .env   # then fill APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY_PATH
 ```
 
-2. Install dependencies:
+MusicKit credentials (Apple Developer Portal → Membership / MusicKit key):
+**Team ID**, **Key ID**, **Private Key (.p8)**. See
+[Apple's docs](https://developer.apple.com/documentation/applemusicapi/getting_keys_and_creating_tokens).
+
 ```bash
-npm install
+bun run dev        # dev with HMR
+bun run build      # production build
+bun run package    # build + electron-builder installers
 ```
 
-3. Configure MusicKit credentials:
+Releases are tag-driven via GitHub Actions — see [RELEASING.md](RELEASING.md).
 
-Copy `.env.example` to `.env` and fill in your Apple Developer credentials:
-```bash
-cp .env.example .env
-```
-
-You need:
-- **Team ID** — Found in Apple Developer Portal under Membership
-- **Key ID** — Generated when creating a MusicKit key
-- **Private Key (.p8)** — Downloaded when creating the MusicKit key
-
-See [Apple's MusicKit documentation](https://developer.apple.com/documentation/applemusicapi/getting_keys_and_creating_tokens) for details.
-
-## Development
-
-Run the app in development mode:
-```bash
-npm run dev
-```
-
-This starts the Electron app with Vite HMR for the renderer process.
-
-## Building
-
-Build the application:
-```bash
-npm run build
-```
-
-Package for distribution:
-```bash
-npm run package
-```
-
-Output formats by platform:
-- **Linux** — AppImage, .deb
-- **macOS** — .dmg
-- **Windows** — NSIS installer
-
-## Project Structure
+## Project structure
 
 ```
-tuffahi/
-├── electron/
-│   ├── main/               # Main process (Node.js)
-│   │   ├── index.ts        # App lifecycle, windows, tray
-│   │   ├── ipc-handlers.ts # IPC handler registrations
-│   │   ├── auth-window.ts  # Apple auth flow
-│   │   ├── token.ts        # JWT developer token (ES256)
-│   │   └── discord.ts      # Discord RPC
-│   └── preload/
-│       └── index.ts        # contextBridge API
-├── src/                     # Renderer (SolidJS)
-│   ├── components/          # UI components
-│   │   ├── Player/          # Playback controls
-│   │   ├── NowPlaying/      # Full-screen now playing
-│   │   ├── MiniPlayer/      # Compact player window
-│   │   ├── Library/         # User library views
-│   │   ├── Browse/          # Catalog & search
-│   │   ├── Queue/           # Queue panel
-│   │   ├── Settings/        # App settings
-│   │   ├── Sidebar/         # Navigation
-│   │   └── ...
-│   ├── stores/              # SolidJS reactive stores
-│   ├── hooks/               # Custom hooks
-│   ├── services/            # API, cache, storage, Discord
-│   ├── lib/                 # MusicKit utilities
-│   ├── types/               # TypeScript type definitions
-│   └── styles/              # Global CSS
-├── resources/               # App icons
-├── electron.vite.config.ts  # Build config (main, preload, renderer)
-├── electron-builder.yml     # Packaging config
-└── package.json
+electron/main      App lifecycle, windows, tray, IPC, JWT token, Discord
+electron/preload   contextBridge API
+src/components      SolidJS UI (Player, NowPlaying, Library, Browse, …)
+src/stores          Reactive stores (musickit, player, library, ratings)
+src/services        API, cache, storage, Discord, logger
+src/lib             MusicKit helpers
+electron-builder.yml  Packaging   ·   electron.vite.config.ts  Build
 ```
 
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Shortcut | Action |
 |----------|--------|
 | `Space` | Play / Pause |
-| `Ctrl + →` | Next track |
-| `Ctrl + ←` | Previous track |
-| `Ctrl + ↑` | Volume up |
-| `Ctrl + ↓` | Volume down |
-| `Ctrl + M` | Mute / Unmute |
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                     Electron Shell                        │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │              Renderer (SolidJS + Vite)             │  │
-│  │                                                    │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │  │
-│  │  │  Player  │  │ Library  │  │ Browse/Search │   │  │
-│  │  │ Controls │  │  Views   │  │    Views      │   │  │
-│  │  └──────────┘  └──────────┘  └───────────────┘   │  │
-│  │                       │                           │  │
-│  │            ┌──────────┴──────────┐                │  │
-│  │            │    MusicKit JS      │                │  │
-│  │            │  (Audio Playback)   │                │  │
-│  │            └─────────────────────┘                │  │
-│  └───────────────────────┬────────────────────────────┘  │
-│                          │ IPC (contextBridge)           │
-│  ┌───────────────────────┴────────────────────────────┐  │
-│  │                  Main Process                       │  │
-│  │  • Developer Token (JWT/ES256)                      │  │
-│  │  • Apple auth window                                │  │
-│  │  • System tray & window management                  │  │
-│  │  • Discord Rich Presence                            │  │
-│  │  • Auto-launch & close behavior                     │  │
-│  └────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────┘
-```
+| `Ctrl + →` / `Ctrl + ←` | Next / Previous |
+| `Ctrl + ↑` / `Ctrl + ↓` | Volume up / down |
+| `Ctrl + M` | Mute |
 
 ## DRM / Widevine
 
-This project uses the [Castlabs Electron fork](https://github.com/nicedoc/nicedoc.io) which includes Widevine CDM support for DRM-protected content playback.
+Uses the [Castlabs Electron fork](https://github.com/castlabs/electron-releases)
+(Widevine CDM) for DRM-protected playback.
 
 ## License
 

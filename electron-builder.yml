@@ -33,18 +33,7 @@ linux:
   maintainer: Salama Ashoush <salamaashoush@gmail.com>
   synopsis: Cross-platform Apple Music client
 
-mac:
-  # zip is required alongside dmg for electron-updater auto-updates.
-  target:
-    - dmg
-    - zip
-  icon: resources/icons/icon.icns
-  category: public.app-category.music
-  hardenedRuntime: true
-  gatekeeperAssess: false
-
-dmg:
-  artifactName: ${productName}-${version}-${arch}.${ext}
+# No macOS target — Apple ships a native Apple Music app.
 
 win:
   target:
