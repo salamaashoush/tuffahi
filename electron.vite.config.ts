@@ -24,7 +24,15 @@ function generateDeveloperToken(): string {
   }
 
   if (!teamId || !keyId || !privateKey) {
-    console.warn('[build] Missing Apple credentials — developer token will be empty');
+    const msg =
+      '[build] Missing Apple credentials (APPLE_TEAM_ID / APPLE_KEY_ID / ' +
+      'APPLE_PRIVATE_KEY[_PATH]) — the MusicKit developer token would be empty.';
+    // Never ship a tokenless build: hard-fail in CI / production builds.
+    // Local dev without creds still works (UI loads, playback won't auth).
+    if (process.env.CI || process.env.NODE_ENV === 'production') {
+      throw new Error(msg + ' Failing the build.');
+    }
+    console.warn(msg + ' (dev: continuing with empty token)');
     return '';
   }
 

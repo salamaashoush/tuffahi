@@ -21,6 +21,19 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
+    # Job-level env so BOTH `bun run build` (which bakes the MusicKit
+    # developer token via electron.vite.config.ts) and electron-builder
+    # see the credentials. Putting these only on the package step shipped
+    # builds with an empty token → "MusicKit not initialized".
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+      APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
+      # Optional Windows code signing.
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -46,13 +59,3 @@ jobs:
 
       - name: Package & publish
         run: bunx electron-builder --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional Windows code signing — set these repo secrets to enable.
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-          # MusicKit developer token is baked at build time by
-          # electron.vite.config.ts.
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
-          APPLE_PRIVATE_KEY: ${{ secrets.APPLE_PRIVATE_KEY }}
