@@ -1,4 +1,5 @@
 import { Component, For, Show } from 'solid-js';
+import { A } from '@solidjs/router';
 import { libraryStore } from '../../stores/library';
 import { playerStore } from '../../stores/player';
 import { formatArtworkUrl } from '../../lib/musickit';
@@ -44,10 +45,7 @@ const Playlists: Component = () => {
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             <For each={state().playlists}>
               {(playlist) => (
-                <button
-                  onClick={() => handlePlay(playlist.id)}
-                  class="group text-left"
-                >
+                <A href={`/playlist/${playlist.id}`} class="group text-left block">
                   <div class="relative aspect-square mb-2">
                     <Show
                       when={playlist.attributes.artwork}
@@ -64,21 +62,25 @@ const Playlists: Component = () => {
                       />
                     </Show>
 
-                    {/* Play overlay */}
-                    <div class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center">
+                    {/* Play overlay — does not block navigation */}
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePlay(playlist.id); }}
+                      class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center"
+                      title="Play"
+                    >
                       <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
                         <svg class="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z" />
                         </svg>
                       </div>
-                    </div>
+                    </button>
                   </div>
 
-                  <p class="text-sm font-medium text-white truncate">
+                  <p class="text-sm font-medium text-white truncate group-hover:underline">
                     {playlist.attributes.name}
                   </p>
                   <p class="text-xs text-white/60">Playlist</p>
-                </button>
+                </A>
               )}
             </For>
           </div>

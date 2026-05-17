@@ -2,7 +2,6 @@ import { Component, For, Show, createSignal } from 'solid-js';
 import { A, useLocation } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { libraryStore } from '../../stores/library';
-import { formatArtworkUrl } from '../../lib/musickit';
 
 interface NavItem {
   path: string;
@@ -11,10 +10,10 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { path: '/', label: 'Listen Now', icon: '▶' },
+  { path: '/search', label: 'Search', icon: '⌕' },
+  { path: '/', label: 'Home', icon: '⌂' },
   { path: '/browse', label: 'Browse', icon: '◉' },
   { path: '/radio', label: 'Radio', icon: '◎' },
-  { path: '/search', label: 'Search', icon: '⌕' },
   { path: '/curators', label: 'Curators', icon: '♛' },
 ];
 
@@ -133,39 +132,31 @@ const Sidebar: Component = () => {
         </nav>
 
         <SectionLabel>Playlists</SectionLabel>
-        <Show
-          when={musicKitStore.isAuthorized()}
-          fallback={
-            <div class="px-4 py-2 text-sm text-white/40">Sign in to see your playlists</div>
-          }
-        >
-          <div class="space-y-0.5">
+        <nav class="space-y-0.5">
+          <NavLink path="/library/playlists" label="All Playlists" icon="▦" />
+          <Show
+            when={musicKitStore.isAuthorized()}
+            fallback={
+              <div class="px-4 py-2 text-sm text-white/40">Sign in to see your playlists</div>
+            }
+          >
             <For each={libraryStore.state().playlists}>
               {(playlist) => (
                 <A
                   href={`/playlist/${playlist.id}`}
-                  class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-white/55 hover:text-white hover:bg-white/5 transition-smooth"
+                  class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-smooth ${
+                    isActive(`/playlist/${playlist.id}`)
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/55 hover:text-white hover:bg-white/5'
+                  }`}
                 >
-                  <Show
-                    when={playlist.attributes.artwork}
-                    fallback={
-                      <div class="w-9 h-9 rounded-md bg-surface-tertiary flex items-center justify-center text-xs flex-shrink-0">
-                        ♫
-                      </div>
-                    }
-                  >
-                    <img
-                      src={formatArtworkUrl(playlist.attributes.artwork, 72)}
-                      alt=""
-                      class="w-9 h-9 rounded-md object-cover flex-shrink-0 ring-1 ring-white/10"
-                    />
-                  </Show>
+                  <span class="w-5 text-center text-base flex-shrink-0">♫</span>
                   <span class="truncate">{playlist.attributes.name}</span>
                 </A>
               )}
             </For>
-          </div>
-        </Show>
+          </Show>
+        </nav>
       </div>
     </aside>
   );

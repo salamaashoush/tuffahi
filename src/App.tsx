@@ -20,6 +20,7 @@ const Radio = lazy(() => import('./components/Radio/Radio'));
 const Search = lazy(() => import('./components/Browse/Search'));
 const ArtistPage = lazy(() => import('./components/Browse/ArtistPage'));
 const AlbumPage = lazy(() => import('./components/Album/AlbumPage'));
+const GenrePage = lazy(() => import('./components/Browse/GenrePage'));
 const PlaylistPage = lazy(() => import('./components/Playlist/PlaylistPage'));
 const Library = lazy(() => import('./components/Library/Library'));
 const RecentlyPlayed = lazy(() => import('./components/Library/RecentlyPlayed'));
@@ -222,6 +223,7 @@ const App: Component = () => {
       <Route path="/settings" component={Settings} />
       <Route path="/artist/:id" component={ArtistPage} />
       <Route path="/album/:id" component={AlbumPage} />
+      <Route path="/genre/:id" component={GenrePage} />
       <Route path="/playlist/:id" component={PlaylistPage} />
       <Route path="/curators" component={CuratorsPage} />
       <Route path="/curator/:id" component={CuratorDetailPage} />

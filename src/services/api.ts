@@ -354,6 +354,30 @@ export const catalogAPI = {
     );
   },
 
+  // Apple has no /genres/{id}/playlists endpoint — the real way to get a
+  // genre's content is the charts endpoint filtered by `genre`.
+  async getGenreCharts(genreId: string, limit: number = 24): Promise<MusicKit.ChartResults> {
+    const mk = musicKitStore.instance();
+    if (!mk) throw new APIError('MusicKit not initialized');
+
+    const cacheKey = `genre-charts:${genreId}:${limit}`;
+
+    return fetchWithCache(
+      cacheKey,
+      async () => {
+        const response = await withRetry(() =>
+          mk.api.music('/v1/catalog/{{storefrontId}}/charts', {
+            types: 'songs,albums,playlists',
+            genre: genreId,
+            limit,
+          })
+        );
+        return (response.data as { results: MusicKit.ChartResults }).results;
+      },
+      CACHE_DURATION.LONG
+    );
+  },
+
   async getGenres(): Promise<MusicKit.Genre[]> {
     const mk = musicKitStore.instance();
     if (!mk) throw new APIError('MusicKit not initialized');

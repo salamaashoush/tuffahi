@@ -6,6 +6,7 @@
 import { createSignal, createRoot } from 'solid-js';
 import { musicKitStore } from './musickit';
 import { logger } from '../services/logger';
+import { toast } from '../components/Toast/Toast';
 
 export type RatingValue = 1 | -1 | null;
 type RatingType = 'songs' | 'albums' | 'playlists';
@@ -51,44 +52,48 @@ function createRatingsStore() {
     }
   }
 
+  function applyLocal(type: RatingType, id: string, value: RatingValue) {
+    setRatings((prev) => {
+      const next = new Map(prev);
+      if (value === null) next.delete(key(type, id));
+      else next.set(key(type, id), value);
+      return next;
+    });
+  }
+
   async function setRating(type: RatingType, id: string, value: RatingValue): Promise<void> {
     const mk = musicKitStore.instance();
     if (!mk || !musicKitStore.isAuthorized()) return;
-    // Ratings API only works with catalog IDs
-    if (isLibraryId(id)) return;
+    if (isLibraryId(id)) {
+      // Apple's ratings API requires catalog IDs.
+      toast.warning('Not available', 'Rate the catalog version of this item.');
+      return;
+    }
+
+    // Optimistic: flip the UI now, revert if the request fails.
+    const previous = getRating(type, id);
+    applyLocal(type, id, value);
 
     try {
       if (value === null) {
-        // DELETE rating
         await mk.api.music(`/v1/me/ratings/${type}/${id}`, {}, {
           fetchOptions: { method: 'DELETE' },
         });
       } else {
-        // PUT rating
         await mk.api.music(`/v1/me/ratings/${type}/${id}`, {}, {
           fetchOptions: {
             method: 'PUT',
-            body: JSON.stringify({
-              type: 'rating',
-              attributes: { value },
-            }),
+            // Apple rejects the PUT without an explicit JSON content type.
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'rating', attributes: { value } }),
           },
         });
       }
-
-      setRatings((prev) => {
-        const next = new Map(prev);
-        if (value === null) {
-          next.delete(key(type, id));
-        } else {
-          next.set(key(type, id), value);
-        }
-        return next;
-      });
-
       logger.info('ratings', `Rating set: ${type}/${id} = ${value}`);
     } catch (err) {
+      applyLocal(type, id, previous); // revert optimistic change
       logger.error('ratings', 'Failed to set rating', { type, id, value, err });
+      toast.error('Rating failed', 'Could not save your rating. Try again.');
     }
   }
 

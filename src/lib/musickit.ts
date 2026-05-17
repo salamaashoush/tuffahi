@@ -8,7 +8,15 @@ export function formatArtworkUrl(
   if (!artwork?.url) {
     return '/placeholder-album.png';
   }
-  return artwork.url.replace('{w}', String(size)).replace('{h}', String(size));
+  // Apple artwork URLs are templates: .../{w}x{h}{c}.{f}
+  // Fill {f}=webp (Apple's format — smaller & sharper) and {c}=bb (default
+  // crop). .replace is a no-op when a token is absent (some URLs are
+  // already concrete, e.g. .../600x600bb.jpg).
+  return artwork.url
+    .replace('{w}', String(size))
+    .replace('{h}', String(size))
+    .replace('{c}', 'bb')
+    .replace('{f}', 'webp');
 }
 
 export function formatDuration(milliseconds: number): string {

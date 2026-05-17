@@ -1,8 +1,8 @@
-import { Component, createSignal, For, Show } from 'solid-js';
+import { Component, createSignal, createResource, For, Show } from 'solid-js';
 import { useNavigate, A } from '@solidjs/router';
 import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
-import { searchAPI, libraryAPI } from '../../services/api';
+import { searchAPI, libraryAPI, catalogAPI } from '../../services/api';
 import { formatArtworkUrl, formatDuration } from '../../lib/musickit';
 import QualityBadge from '../QualityBadge/QualityBadge';
 import SearchSuggestions from './SearchSuggestions';
@@ -16,6 +16,49 @@ interface SearchResult {
   playlists: any[];
 }
 
+// Genres have no artwork in the public API — stable fallback color.
+const categoryColor = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return `hsl(${h} 58% 40%)`;
+};
+
+// Category tile: lazily fetches a representative image (the genre's top
+// playlist artwork — getGenrePlaylists is cached). Color shows until then.
+const CategoryTile: Component<{ id: string; name: string }> = (p) => {
+  const [art] = createResource(
+    () => (musicKitStore.instance() ? p.id : null),
+    async (id) => {
+      const c = await catalogAPI.getGenreCharts(id, 1).catch(() => ({} as any));
+      const first =
+        (c as any).albums?.[0]?.data?.[0] ??
+        (c as any).playlists?.[0]?.data?.[0] ??
+        (c as any).songs?.[0]?.data?.[0];
+      return first?.attributes?.artwork ?? null;
+    },
+  );
+  return (
+    <A
+      href={`/genre/${p.id}`}
+      class="relative aspect-[16/9] rounded-xl overflow-hidden text-left group block"
+      style={{ background: categoryColor(p.name) }}
+    >
+      <Show when={art()}>
+        <img
+          src={formatArtworkUrl(art()!, 480)}
+          alt=""
+          loading="lazy"
+          class="absolute inset-0 w-full h-full object-cover"
+        />
+      </Show>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent group-hover:from-black/60 transition-colors" />
+      <span class="absolute bottom-3 left-4 text-white font-semibold text-lg drop-shadow">
+        {p.name}
+      </span>
+    </A>
+  );
+};
+
 const Search: Component = () => {
   const navigate = useNavigate();
   const [query, setQuery] = createSignal('');
@@ -27,6 +70,14 @@ const Search: Component = () => {
   const [suggestions, setSuggestions] = createSignal<any[]>([]);
   const [showSuggestions, setShowSuggestions] = createSignal(false);
   const [lyricHighlights, setLyricHighlights] = createSignal<Record<string, string[]>>({});
+
+  // Browse Categories (shown when there's no query) — public genres API.
+  const [genres] = createResource(
+    () => (musicKitStore.instance() ? 'genres' : null),
+    () => catalogAPI.getGenres().catch(() => [] as MusicKit.Genre[]),
+  );
+
+
 
   let searchTimeout: number | undefined;
   let suggestionsTimeout: number | undefined;
@@ -382,26 +433,113 @@ const Search: Component = () => {
                 </div>
               </section>
             </Show>
+
+            {/* Artists */}
+            <Show when={res().artists.length > 0}>
+              <section>
+                <h2 class="text-xl font-semibold text-white mb-4">Artists</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <For each={res().artists}>
+                    {(artist) => (
+                      <A href={`/artist/${artist.id}`} class="group text-center">
+                        <div class="relative w-full aspect-square mb-2">
+                          <Show
+                            when={artist.attributes?.artwork}
+                            fallback={
+                              <div class="w-full h-full bg-surface-secondary rounded-full flex items-center justify-center">
+                                <span class="text-4xl text-white/20">♫</span>
+                              </div>
+                            }
+                          >
+                            <img
+                              src={formatArtworkUrl(artist.attributes.artwork, 300)}
+                              alt={artist.attributes?.name}
+                              class="w-full h-full object-cover rounded-full ring-1 ring-white/10 group-hover:ring-white/30 transition-all"
+                            />
+                          </Show>
+                        </div>
+                        <p class="text-sm font-medium text-white truncate group-hover:underline">
+                          {artist.attributes?.name}
+                        </p>
+                      </A>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
+
+            {/* Playlists */}
+            <Show when={res().playlists.length > 0}>
+              <section>
+                <h2 class="text-xl font-semibold text-white mb-4">Playlists</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <For each={res().playlists}>
+                    {(pl) => (
+                      <div class="group text-left">
+                        <A href={`/playlist/${pl.id}`} class="block">
+                          <div class="relative aspect-square mb-2">
+                            <Show
+                              when={pl.attributes?.artwork}
+                              fallback={
+                                <div class="w-full h-full bg-surface-secondary rounded-lg flex items-center justify-center">
+                                  <span class="text-4xl text-white/20">♫</span>
+                                </div>
+                              }
+                            >
+                              <img
+                                src={formatArtworkUrl(pl.attributes.artwork, 300)}
+                                alt={pl.attributes?.name}
+                                class="w-full h-full object-cover rounded-lg album-shadow-sm"
+                              />
+                            </Show>
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); playerStore.playPlaylist(pl.id); }}
+                              class="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-smooth flex items-center justify-center"
+                              title="Play"
+                            >
+                              <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-black ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </button>
+                          </div>
+                          <p class="text-sm font-medium text-white truncate hover:underline">{pl.attributes?.name}</p>
+                        </A>
+                        <Show when={pl.attributes?.curatorName}>
+                          <p class="text-xs text-white/60 truncate">{pl.attributes.curatorName}</p>
+                        </Show>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </section>
+            </Show>
           </div>
         )}
       </Show>
 
-      {/* Empty State */}
+      {/* Browse Categories (empty state) */}
       <Show when={!results() && !isSearching()}>
-        <div class="text-center py-20">
-          <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-surface-secondary flex items-center justify-center">
-            <svg class="w-10 h-10 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-          <h2 class="text-xl font-semibold text-white mb-2">Search Apple Music</h2>
-          <p class="text-white/60">Find your favorite songs, albums, and artists</p>
-        </div>
+        <section>
+          <h2 class="text-xl font-semibold text-white mb-4">Browse Categories</h2>
+          <Show
+            when={!genres.loading && (genres()?.length ?? 0) > 0}
+            fallback={
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <For each={Array(12).fill(0)}>
+                  {() => <div class="aspect-[16/9] rounded-xl bg-surface-secondary animate-pulse" />}
+                </For>
+              </div>
+            }
+          >
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <For each={genres()}>
+                {(g) => <CategoryTile id={g.id} name={g.attributes.name} />}
+              </For>
+            </div>
+          </Show>
+        </section>
       </Show>
     </div>
   );

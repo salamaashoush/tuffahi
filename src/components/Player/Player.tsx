@@ -2,7 +2,6 @@ import { Component, Show, For, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { usePlayer } from '../../hooks/usePlayer';
 import { formatArtworkUrl } from '../../lib/musickit';
-import { musicKitStore } from '../../stores/musickit';
 import { playerStore } from '../../stores/player';
 import { searchAPI } from '../../services/api';
 import Controls from './Controls';
@@ -123,21 +122,7 @@ const Player: Component<PlayerProps> = (props) => {
           </Show>
         </div>
 
-        {/* AirPlay Button */}
-        <Show when={typeof (musicKitStore.instance() as any)?.showPlaybackTargetPicker === 'function'}>
-          <button
-            onClick={() => {
-              const mk = musicKitStore.instance() as any;
-              mk?.showPlaybackTargetPicker?.();
-            }}
-            class="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-smooth"
-            title="AirPlay"
-          >
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v12h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
-            </svg>
-          </button>
-        </Show>
+        {/* AirPlay removed: WebKit/Apple-only — non-functional in Electron/Chromium */}
 
         {/* Queue Button */}
         <button
